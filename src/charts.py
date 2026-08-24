@@ -128,36 +128,6 @@ def build_forecast_chart(history, forecast_months, saved_results: list, draft_re
     return fig
 
 
-def build_comparison_chart(saved_results: list, draft_result) -> go.Figure:
-    """Horizontal bars, total revenue per scenario (section 6, item 3). Same
-    colour per scenario as the forecast chart, so a scenario reads as the
-    same colour everywhere it appears."""
-    results = list(saved_results) + [draft_result]
-    colors = scenario_colors(saved_results) + [DRAFT_COLOR]
-    names = [display_name(r) for r in results]
-    totals = [r.total_revenue for r in results]
-
-    fig = go.Figure(
-        go.Bar(
-            x=totals,
-            y=names,
-            orientation="h",
-            marker=dict(color=colors),
-            text=[format_currency(v) for v in totals],
-            textposition="auto",
-            hovertemplate="%{y}<br>%{text}<extra></extra>",
-        )
-    )
-    fig.update_layout(
-        title=copy.CHART_COMPARE_TITLE,
-        xaxis=dict(tickprefix="€", tickformat="~s"),
-        yaxis=dict(autorange="reversed"),
-        showlegend=False,
-        margin=dict(t=60),
-    )
-    return fig
-
-
 def build_driver_chart(saved_results: list, draft_result) -> go.Figure:
     """Stacked bars splitting each scenario's 12-month total into base
     business, from marketing, and from initiatives (section 6, item 4).

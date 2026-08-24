@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src import copy
-from src.charts import build_comparison_chart, build_driver_chart, build_forecast_chart, display_name
+from src.charts import build_driver_chart, build_forecast_chart, display_name
 from src.formatting import format_currency, format_date, format_percent
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import ONE_MONTH, PERMANENT, Scenario, Uplift, check_guardrails, compare_scenarios, run_scenario
@@ -210,9 +210,6 @@ forecast_fig = build_forecast_chart(HISTORY, FORECAST_MONTHS, saved_results, dra
 st.plotly_chart(forecast_fig, use_container_width=True)
 
 st.subheader(copy.CHART_COMPARE_TITLE)
-comparison_fig = build_comparison_chart(saved_results, draft_result)
-st.plotly_chart(comparison_fig, use_container_width=True)
-
 comparison_table = pd.DataFrame(
     [
         {
@@ -221,6 +218,9 @@ comparison_table = pd.DataFrame(
             copy.HEADLINE_TOTAL_SPEND: format_currency(row.total_spend),
             copy.HEADLINE_REVENUE_PER_SPEND: f"€{row.revenue_per_spend:.2f}",
             copy.HEADLINE_VS_BASELINE: format_percent(row.delta_vs_baseline, signed=True),
+            copy.CHART_DRIVERS_BASE_LABEL: format_currency(result.base_business.sum()),
+            copy.CHART_DRIVERS_MARKETING_LABEL: format_currency(result.from_marketing.sum()),
+            copy.CHART_DRIVERS_INITIATIVES_LABEL: format_currency(result.from_initiatives.sum()),
         }
         for result, row in zip(all_results, rows)
     ]
