@@ -188,9 +188,27 @@ with st.sidebar:
             )
             st.rerun()
 
+draft_scenario = Scenario(
+    name=copy.HEADLINE_DRAFT_SCENARIO_LABEL,
+    monthly_budget=list(st.session_state.draft_budget),
+    baseline_growth=st.session_state.draft_baseline_growth_pct / 100,
+    uplifts=uplifts_from_editor(st.session_state.draft_uplifts_df),
+)
+draft_result = run_scenario(FITTED, draft_scenario)
+
 results = [run_scenario(FITTED, s) for s in st.session_state.scenarios.values()]
 baseline_name = "Plan" if "Plan" in st.session_state.scenarios else results[0].scenario.name
+baseline_result = next(r for r in results if r.scenario.name == baseline_name)
 rows = compare_scenarios(results, baseline_name=baseline_name)
+
+draft_vs_baseline = draft_result.total_revenue / baseline_result.total_revenue - 1
+
+st.caption(copy.HEADLINE_SECTION_CAPTION.format(baseline=baseline_name))
+metric_cols = st.columns(4)
+metric_cols[0].metric(copy.HEADLINE_TOTAL_REVENUE, format_currency(draft_result.total_revenue))
+metric_cols[1].metric(copy.HEADLINE_TOTAL_SPEND, format_currency(draft_result.total_spend))
+metric_cols[2].metric(copy.HEADLINE_REVENUE_PER_SPEND, f"€{draft_result.revenue_per_spend:.2f}")
+metric_cols[3].metric(copy.HEADLINE_VS_BASELINE, format_percent(draft_vs_baseline, signed=True))
 
 st.subheader(copy.CHART_COMPARE_TITLE)
 comparison_table = pd.DataFrame(

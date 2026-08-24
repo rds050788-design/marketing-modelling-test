@@ -49,6 +49,37 @@ Impact if undetected: baseline growth would have been overstated at roughly
 produces. Caught because checkpoint 1 had a hard gate requiring the fitted
 coefficients to match the spec before moving on.
 
+### Stale live-server verification gap
+
+While building checkpoint 5's headline metric cards, the AI edited `copy.py`
+and `app.py`, ran `streamlit.testing.v1.AppTest` in a fresh subprocess (which
+read the current files and passed with no exceptions), and reported the
+checkpoint as "Verified via AppTest: no exceptions." The user then hit an
+`AttributeError` on the actual running app at `localhost:8501` for a constant
+that, per the files on disk, existed.
+
+**Root cause:** the background Streamlit server had been running continuously
+since checkpoint 4 and was never restarted after subsequent edits. Python
+caches imported modules in `sys.modules` per process; Streamlit re-executes
+`app.py`'s top level on every rerun, but `from src import copy` in an
+already-running process rebinds to the cached module object rather than
+re-reading the file. The live server was serving a stale, pre-edit `copy.py`
+— which also explains why the section-5 currency-formatting fix (`"Marketing
+budget (€M)"`) looked unfixed to the user, even though it was already correct
+on disk. `AppTest`'s fresh subprocess never touched that stale state, so it
+kept passing while the actual page the user was looking at was broken.
+
+**Impact:** the AI's "verified" claim was true of the source files and false
+as a claim about the running app — exactly the kind of gate the user said
+they were relying on. Caught only because the user checked the live app
+directly rather than trusting the report.
+
+**Fix:** after any change to `src/*.py` or `app.py`, the AI now kills and
+restarts the actual background server process, confirms a new PID, curls it
+for liveness, and only then runs `AppTest` — so "verified" means the live
+server was rebuilt from current disk state, not just that an isolated
+subprocess happened to read the right files.
+
 ### Build order: risk-first over dependency-first
 
 The AI proposed a bottom-up build order by dependency: `copy.py` →

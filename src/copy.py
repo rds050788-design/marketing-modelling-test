@@ -94,6 +94,8 @@ HEADLINE_TOTAL_REVENUE = "Total 12-month revenue"
 HEADLINE_TOTAL_SPEND = "Total marketing spend"
 HEADLINE_REVENUE_PER_SPEND = "Revenue per €1 spent"
 HEADLINE_VS_BASELINE = "Change vs the baseline scenario"
+HEADLINE_DRAFT_SCENARIO_LABEL = "Current plan"
+HEADLINE_SECTION_CAPTION = "Your current plan, compared to the {baseline} scenario"
 
 # --- Charts (section 6, items 2-4) ------------------------------------------
 
