@@ -5,11 +5,11 @@ planned initiatives, and compare scenarios before committing to one.
 
 ## Live link
 
-**Not yet deployed.** Packaging, testing, and Docker verification are done
-(see `AI_INTERACTIONS.md` and `decisions.md` for the current build status);
-deployment to Streamlit Community Cloud is the one remaining step. This
-line will be replaced with the hosted URL once it's live — see
-[Deployment](#deployment-and-production-note) below for the plan.
+https://revenue-scenario-planner.streamlit.app — no installation required.
+
+The app sleeps after 12 hours without traffic, so the first visit after a
+quiet period takes about a minute to wake. A slow first load is not a
+broken app.
 
 ## What this tool does
 
