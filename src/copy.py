@@ -62,7 +62,7 @@ INITIATIVES_MODE_HELP = (
 
 # --- Sidebar: baseline growth -----------------------------------------------
 
-BASELINE_GROWTH_LABEL = "Revenue growth per month without extra marketing"
+BASELINE_GROWTH_LABEL = "Revenue growth per month without extra marketing (%)"
 BASELINE_GROWTH_HELP = (
     "Revenue grows about 3.5% a month on its own, without extra marketing. Adjust "
     "this if you expect the game's natural growth to speed up or slow down."
