@@ -379,6 +379,40 @@ the container (not the host venv), and booted the container to confirm
 the app itself serves -- all three passed clean, which is the first time
 these exact pinned versions had actually been exercised end to end.
 
+### Zero budget: a modelling boundary, not just an input gap
+
+The user reported a zero budget crashing the app with `ZeroDivisionError`
+in `check_guardrails` (a month-over-month percentage change computed as
+`curr/prev - 1`, undefined when `prev` is zero). Fixing only that
+division would have been treating this as an input-validation problem --
+clamp the denominator, move on. The user's framing was more precise: "the
+model uses Δlog(spend), so log(0) is undefined and fixing the division
+will move the crash downstream." That's a claim about the *model*, not
+the guardrail code -- the growth-rate-with-carryover specification
+(`CLAUDE.md` §3) has no defined behaviour at zero spend, because its
+entire mechanism is a log-difference, and `log(0)` is `-inf` by
+definition, not an implementation oversight.
+
+Confirmed by reverting only the `check_guardrails` fix: exact reported
+`ZeroDivisionError`. Confirmed separately by reverting only the
+`model.py` fix (with `check_guardrails` left correct): no exception at
+all -- `log(0)` propagates through `numpy` as `-inf`, then `nan`, silently
+corrupting every month *after* the zero one into `nan`, which is arguably
+worse than a crash since nothing signals that anything went wrong. Both
+were real, independent failure modes stacked in the same code path, and
+the second would have shipped invisibly if the fix had stopped at the
+division.
+
+Resolution treats zero as a boundary condition of the specification, not
+noise to be validated away: any month-over-month transition touching a
+zero (or negative) spend month has no defined marketing contribution, so
+that transition contributes nothing beyond baseline growth -- an explicit
+modelling decision (documented in `model.py`), not a silent clamp. Also
+surfaced as a specific plain-language message (`copy.py`) distinct from
+the generic "too small" guardrail, since zero isn't just an extreme value
+on the same scale -- it's a different regime the model has nothing to say
+about.
+
 ---
 
 ## Overrides
