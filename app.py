@@ -45,6 +45,14 @@ def preset_scenarios() -> dict:
     }
 
 
+def display_name(result) -> str:
+    """Scenario name, flagged with the guardrail marker if its budget goes
+    outside the tested range. Use this wherever a scenario name is shown."""
+    if result.guardrail_breaches:
+        return f"{result.scenario.name} {copy.GUARDRAIL_SCENARIO_MARKER}"
+    return result.scenario.name
+
+
 def uplifts_from_editor(df: pd.DataFrame) -> list:
     uplifts = []
     for _, row in df.iterrows():
@@ -87,7 +95,7 @@ with st.sidebar:
     budget_df = pd.DataFrame(
         {
             copy.BUDGET_MONTH_COLUMN: MONTH_LABELS,
-            copy.BUDGET_AMOUNT_COLUMN: st.session_state.draft_budget,
+            copy.BUDGET_AMOUNT_COLUMN: [b / 1_000_000 for b in st.session_state.draft_budget],
         }
     )
     edited_budget_df = st.data_editor(
@@ -95,14 +103,16 @@ with st.sidebar:
         column_config={
             copy.BUDGET_MONTH_COLUMN: st.column_config.TextColumn(disabled=True),
             copy.BUDGET_AMOUNT_COLUMN: st.column_config.NumberColumn(
-                format="€%d", min_value=0, help=copy.BUDGET_TABLE_HELP
+                format="€%.2f", min_value=0.0, step=0.01, help=copy.BUDGET_TABLE_HELP
             ),
         },
         hide_index=True,
         use_container_width=True,
         key="budget_editor",
     )
-    st.session_state.draft_budget = edited_budget_df[copy.BUDGET_AMOUNT_COLUMN].tolist()
+    st.session_state.draft_budget = [
+        round(v * 1_000_000) for v in edited_budget_df[copy.BUDGET_AMOUNT_COLUMN].tolist()
+    ]
 
     scale_col, apply_col = st.columns([2, 1])
     with scale_col:
@@ -186,13 +196,15 @@ st.subheader(copy.CHART_COMPARE_TITLE)
 comparison_table = pd.DataFrame(
     [
         {
-            "Scenario": row.name,
+            "Scenario": display_name(result),
             copy.HEADLINE_TOTAL_REVENUE: format_currency(row.total_revenue),
             copy.HEADLINE_TOTAL_SPEND: format_currency(row.total_spend),
             copy.HEADLINE_REVENUE_PER_SPEND: f"€{row.revenue_per_spend:.2f}",
             copy.HEADLINE_VS_BASELINE: format_percent(row.delta_vs_baseline, signed=True),
         }
-        for row in rows
+        for result, row in zip(results, rows)
     ]
 )
 st.dataframe(comparison_table, hide_index=True, use_container_width=True)
+if any(result.guardrail_breaches for result in results):
+    st.caption(copy.GUARDRAIL_SCENARIO_FOOTNOTE)

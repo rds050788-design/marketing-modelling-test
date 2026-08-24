@@ -37,7 +37,7 @@ BUDGET_SCALE_HELP = (
     "instead of editing each one."
 )
 BUDGET_MONTH_COLUMN = "Month"
-BUDGET_AMOUNT_COLUMN = "Marketing budget"
+BUDGET_AMOUNT_COLUMN = "Marketing budget (€M)"
 
 # --- Sidebar: game initiatives ---------------------------------------------
 
@@ -81,6 +81,11 @@ GUARDRAIL_SPEND_TOO_LOW = "This budget is far smaller than anything tried before
 GUARDRAIL_MOM_CHANGE = (
     "This is a much bigger month-to-month change in spend than we've seen before — "
     "treat with caution"
+)
+GUARDRAIL_SCENARIO_MARKER = "*"
+GUARDRAIL_SCENARIO_FOOTNOTE = (
+    "* This scenario's budget goes outside the range tested in the underlying data — "
+    "treat its forecast with extra caution."
 )
 
 # --- Headline metrics (section 6, item 1) -----------------------------------
