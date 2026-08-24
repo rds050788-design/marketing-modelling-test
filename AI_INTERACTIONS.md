@@ -3,21 +3,232 @@
 Curated, annotated record of the AI's role in specifying and building this
 tool. Structured in three parts: the modelling debate (Specification), the
 build itself (Build), and the moments the user overrode the AI's judgment
-(Overrides).
+(Overrides). Specification and build were two separate phases with two
+separate tools: the specification below was done in a chat interface with
+Claude Opus 4.6, using code execution for statistical verification, over
+roughly two hours before any application code was written; the build that
+follows was done in Claude Code, working from the frozen decision record
+that specification phase produced (`CLAUDE.md`).
 
 ---
 
 ## Specification
 
-### Hosting pivot: Hugging Face Spaces to Streamlit Community Cloud
+### 1. Reading the brief
 
-The original plan was Hugging Face Spaces with the Docker SDK, so a single
-container would serve both the VP of Product and the interview panel. This
-hit the free tier's concurrency quota. The deployment pivoted to Streamlit
-Community Cloud, which containerizes directly from `requirements.txt`. The
-Dockerfile was retained for local reproducibility and to satisfy the brief's
-containerization requirement. Three launch paths are documented: the hosted
-link, `docker build && docker run`, and `run.bat` / `run.sh`.
+Opened by asking for an interpretation of the exercise from a senior
+engineer's perspective, before any data was shared.
+
+The useful output was not a task list but a reframing: the brief is
+deliberately under-specified, there is no correct model hidden in the
+data, and the 2–3 hour cap is part of the test. What is being assessed is
+whether a vague stakeholder request can be turned into a usable artifact
+within a fixed budget, with assumptions made explicit.
+
+**Decision:** treat documented assumptions and the AI-interactions
+document as graded deliverables, not boilerplate.
+
+### 2. First analysis was speculative — and wrong
+
+Before the dataset was attached, the discussion covered adstock,
+saturation curves, seasonality, and cohort-level LTV.
+
+The dataset arrived: 21 rows, three columns. Most of that was not
+estimable. Twelve seasonal terms cannot be fitted to 21 observations;
+there is no channel split; there are no cohorts.
+
+**Recorded because it is the honest shape of the process.** The first
+plausible answer was built on assumptions about data that did not hold.
+The correction came from loading the file, not from more reasoning.
+
+### 3. The collinearity finding
+
+Asked for a review of an appropriate simple model, with the data in hand.
+Rather than proposing one, the analysis ran competing specifications and
+compared them.
+
+| Specification | Spend coefficient | R² |
+|---|---|---|
+| `revenue ~ spend` | 5.07 (p<0.001) | 0.969 |
+| `revenue ~ spend + trend` | 1.24 (p=0.10, n.s.) | 0.988 |
+| `revenue ~ trend` only | — | 0.986 |
+| `log(rev) ~ log(spend)` | elasticity 1.49 | 0.976 |
+| `log(rev) ~ log(spend) + trend` | elasticity 0.21 | 0.998 |
+
+Spend correlates with revenue at 0.984; time correlates with revenue at
+0.993 and with spend at 0.983. VIF ≈ 30. Adding a trend collapses the
+marketing coefficient by 75% and removes its significance. A trend alone
+explains 98.6% of variance.
+
+Corroborating: ROAS rises monotonically from 2.71 to 4.16 while spend
+nearly doubles. Improving efficiency at increasing scale is not how paid
+acquisition behaves.
+
+**This is the central finding of the exercise.** The obvious model implies
+€5.07 return on every marginal euro, forever. It is attributing organic
+growth to marketing, and a tool built on it would systematically encourage
+over-spending.
+
+### 4. A claim reversed by testing
+
+The initial position was that carryover could not be identified from 21
+observations. Testing contradicted it:
+
+| Term | Coefficient | p-value |
+|---|---|---|
+| Δspend, current month | 0.301 | 0.0007 |
+| Δspend, prior month | 0.208 | 0.0127 |
+
+Adjusted R² rose from 0.252 to 0.471, and the two-term model won a
+rolling-origin backtest out of sample (0.82% vs 0.99% MAPE). The
+Durbin–Watson statistic on the single-term model had already been hinting
+at an omitted lag.
+
+**Decision:** include the carryover term. The stated impossibility was
+wrong, and running the regression was what established it.
+
+### 5. Specification chosen and alternatives rejected
+
+`Δlog(revenue) = β₀ + β₁·Δlog(spend) + β₂·Δlog(spend)ₜ₋₁`
+
+Rolling-origin, one-step-ahead, expanding window:
+
+| Specification | Mean MAPE |
+|---|---|
+| **Growth + carryover (chosen)** | **0.82%** |
+| Growth, contemporaneous only | 0.99% |
+| log-log + trend | 1.60% |
+| Trend only | 3.68% |
+| Random walk | 4.72% |
+| `revenue ~ spend` | 5.27% |
+
+The defensible specification is also the most accurate. Bootstrap on the
+elasticity (5,000 reps): mean 0.19, 95% interval [0.09, 0.33], P(β<0) =
+0.002.
+
+Rejected, with reasons:
+
+- **Geometric adstock with fitted decay** — grid search peaked at λ≈0.40
+  but was flat between 0.30 and 0.55. Weakly identified; the unconstrained
+  two-lag form avoids committing to a decay rate the data cannot support.
+- **Saturation / Hill curves** — ROAS rises monotonically with no
+  inflection. There is no diminishing-returns signal to fit. Fitting one
+  would invent a parameter. Handled with an out-of-range warning instead.
+- **Seasonality** — not estimable from 21 months, and no December spike is
+  present.
+- **Any ML model** — 20 observations, one feature, and the output must be
+  explainable to a CFO.
+
+### 6. Industry tooling reviewed, then declined
+
+Reviewed the current marketing-mix modelling landscape: Google Meridian
+(Bayesian, TensorFlow Probability, replaced LightweightMMM, added a
+Scenario Planner interface in 2026), Meta Robyn (Ridge with evolutionary
+hyperparameter search), and PyMC-Marketing (fully Bayesian, Python-native).
+The consensus framing is a layered stack — attribution for granularity,
+MMM for privacy-safe aggregate measurement, incrementality experiments as
+the calibration layer.
+
+All three assume multiple channels and roughly two years of weekly data.
+With 21 monthly points and one undifferentiated spend column, a Bayesian
+MMM would be prior-dominated and would mean shipping a multi-gigabyte
+image to serve a two-parameter regression.
+
+**Decision:** name them in the README and explain the rejection. Knowing a
+tool exists and choosing not to use it was judged the stronger signal.
+
+### 7. Uplift semantics — a business decision, not a modelling one
+
+The brief does not say whether an uplift persists or is a single-month
+spike. In a compounding model these diverge sharply. A single +15% uplift
+in month 3 of a 12-month horizon:
+
+| Mode | 12-month total | vs baseline |
+|---|---|---|
+| One-month spike | €275.9M | +1.1% |
+| Permanent lift | €308.3M | +13.0% |
+
+Twelve times the incremental revenue from identical input.
+
+**Decision:** expose both as a user control defaulting to permanent. A
+tool that picks silently is making a strategic call that belongs to the
+VP. Implementing the toggle also forces the correct data structure —
+without separating the compounding base from the displayed value,
+one-month uplifts silently compound and corrupt every downstream number.
+
+Decaying uplifts are the realistic middle case and were left out of scope,
+documented so that a permanent uplift reads as an upper bound.
+
+### 8. Scope held against creep
+
+Explicitly declined, and recorded so the omissions read as decisions:
+budget optimizer, Monte Carlo simulation, multi-channel modelling,
+sensitivity analysis, user accounts, database persistence, decaying
+uplifts, configurable horizons.
+
+The brief asked for exploration and comparison, not optimization.
+
+### 9. AI in the process, not in the product
+
+Considered adding a generated plain-English scenario summary. Declined: it
+needs an API key that cannot live in a public repo, it adds latency and a
+failure mode to a tool whose value is instant response, and the brief asks
+for AI in the *process* of building the solution, not inside it.
+
+The forecasting logic is a transparent statistical model chosen for
+auditability. The VP must be able to explain any number to a CFO.
+
+### 10. Non-technical usability as a hard constraint
+
+Three constraints introduced during specification, all treated as
+requirements rather than polish:
+
+- **No statistical vocabulary anywhere user-facing.** Banned: elasticity,
+  coefficient, p-value, confidence interval, adstock, carryover,
+  regression, MAPE, R², bootstrap, significance. Enforced structurally by
+  routing every user-facing string through `src/copy.py`, making the rule
+  auditable in one file.
+- **A guided first run.** The app opens with three scenarios already built
+  and a dismissible welcome panel explaining what is on screen —
+  explaining something visible rather than touring empty inputs.
+- **One-click launch.** Terminal commands were ruled unacceptable for the
+  end user.
+
+### 11. Deployment: a conflict in the brief, and a pivot
+
+The brief asks for Docker *and* the stakeholder cannot use a terminal.
+These cannot both be satisfied by a single local artifact.
+
+Resolution: containers run on servers. The VP opens a URL; the container
+runs remotely. Initial plan was Hugging Face Spaces with the Docker SDK,
+so one image would serve both the VP and the evaluators.
+
+That plan failed on a free-tier concurrency quota. Pivoted to Streamlit
+Community Cloud, which containerizes from `requirements.txt`. The
+Dockerfile was retained for local reproducibility and to satisfy the
+brief's stated preference.
+
+Three launch paths documented: hosted link (VP), `docker run`
+(evaluators), and `run.bat` / `run.sh` (anyone with Python).
+
+### 12. Process design
+
+Decisions about how the build itself would be run:
+
+- **Separate deciding from building.** All modelling and scoping settled
+  in chat, then frozen into a decision record dropped into the repo as
+  `CLAUDE.md` so the agent read the spec rather than re-deriving it.
+- **Risk-first build order.** Overrode the agent's proposed dependency
+  order to put `model.py` first — it carries the project risk and is the
+  only module with meaningful tests.
+- **Hard gates at checkpoints.** Verification required before proceeding.
+  This is what caught the β₀ transcription error; a fully autonomous run
+  would have accepted the agent's plausible but incorrect explanation and
+  inflated every forecast by 25 percentage points of annual growth.
+- **Manual review at every visual.** No test can determine whether a
+  non-technical stakeholder understands a screen. Manual review caught
+  three defects the passing test suite did not: a frozen chart that
+  ignored budget edits, unlabelled units, and an invisible line colour.
 
 ---
 
@@ -103,6 +314,13 @@ here rather than left implicit. A residual gap: a viewer can still manually
 switch themes via Streamlit's own Settings menu, and there is no
 server-side way to prevent that.
 
+A follow-up correction: the driver chart's "base business" segment was
+initially given a very light warm grey (`#c3c2b7`, 9.72:1 contrast) that
+read as functionally white next to the draft's actual white line -- fixed
+to a genuinely mid-toned slate (`#767570`, 3.77:1) so the largest, least
+interesting segment stays visually recessive and doesn't compete with the
+draft line or the two saturated, signal-carrying segments beside it.
+
 ### Stakeholder UI review before checkpoint 6
 
 Before starting the tutorial and export, the user asked for a presentation-
@@ -115,9 +333,51 @@ code read alone would have missed: a hardcoded `"Apply"` button string that
 had slipped past every previous audit of the no-hardcoded-strings rule, and
 a signed-zero formatting artifact (`+0.0%` vs `-0.0%` for two scenarios with
 identical budgets) caused by floating-point noise between two independently
-computed paths landing a few cents apart. Findings list is in the
-2026-08-24 conversation; none were applied in this pass -- the user has not
-yet picked which to act on.
+computed paths landing a few cents apart. Both were accepted and fixed at
+checkpoint 8 (see below); the other nine findings were left for the user to
+pick from later.
+
+### Checkpoint 8: banned-vocabulary audit and two accepted UI fixes
+
+Grepped `copy.py`, `app.py`, `src/charts.py`, and `src/theme.py` for
+section 5's banned vocabulary (elasticity, coefficient, p-value,
+confidence interval, adstock, carryover, regression, MAPE, R-squared,
+bootstrap, significance, log) -- the only hits were in `copy.py`'s own
+module docstring listing the banned words themselves, not in any actual
+string value. Clean.
+
+Implemented the two UI-review findings the user accepted: moved the
+hardcoded `"Apply"` button string into `copy.py` as
+`BUDGET_SCALE_APPLY_BUTTON`, and fixed `format_percent`'s signed-zero
+artifact by special-casing the "-0.0%" output to "+0.0%" -- rounding to
+zero now always displays as positive regardless of which side of zero the
+underlying float actually landed on. Both changes are presentation-only,
+per the review's own scope. Mutation-checked the signed-zero fix:
+temporarily reverted it, confirmed the new test failed with the exact
+"-0.0%" the user reported, reverted the revert.
+
+### Checkpoint 7: a requirements.txt pin that had never actually been tested
+
+`requirements.txt` had been version-pinned since before this build began,
+but every local test run in this session used Python 3.14 (the only
+interpreter on the development machine), which cannot get wheels for the
+originally pinned `pandas`/`numpy`, so local verification had silently
+been running against newer, unpinned substitutes the whole time -- not
+the versions the Dockerfile's `python:3.12-slim` would actually install.
+
+Building the real image for the first time exposed this: `numpy==2.2.1`
+(released after `statsmodels==0.14.4`) broke a `pandas.util._decorators`
+compatibility path inside statsmodels, and an unpinned `scipy` resolved to
+a version that had removed `scipy._lib._util._lazywhere`, which
+statsmodels 0.14.4 imports. Neither failure was visible from the Python
+3.14 dev venv, where newer versions of everything happened to still work
+together. Root-caused empirically inside throwaway containers (bisecting
+package versions, not reasoning from changelogs) and pinned `numpy==2.1.3`
+(contemporary with statsmodels 0.14.4's release) and a new explicit
+`scipy==1.14.1`. Rebuilt the real image, ran the full test suite inside
+the container (not the host venv), and booted the container to confirm
+the app itself serves -- all three passed clean, which is the first time
+these exact pinned versions had actually been exercised end to end.
 
 ---
 
