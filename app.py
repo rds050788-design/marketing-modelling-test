@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src import copy
+from src.charts import build_forecast_chart, display_name
 from src.formatting import format_currency, format_date, format_percent
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import ONE_MONTH, PERMANENT, Scenario, Uplift, check_guardrails, compare_scenarios, run_scenario
@@ -43,14 +44,6 @@ def preset_scenarios() -> dict:
         "Plan": Scenario("Plan", default_budget(1.0)),
         "Aggressive": Scenario("Aggressive", default_budget(1.15)),
     }
-
-
-def display_name(result) -> str:
-    """Scenario name, flagged with the guardrail marker if its budget goes
-    outside the tested range. Use this wherever a scenario name is shown."""
-    if result.guardrail_breaches:
-        return f"{result.scenario.name} {copy.GUARDRAIL_SCENARIO_MARKER}"
-    return result.scenario.name
 
 
 def uplifts_from_editor(df: pd.DataFrame) -> list:
@@ -196,19 +189,25 @@ draft_scenario = Scenario(
 )
 draft_result = run_scenario(FITTED, draft_scenario)
 
-results = [run_scenario(FITTED, s) for s in st.session_state.scenarios.values()]
-baseline_name = "Plan" if "Plan" in st.session_state.scenarios else results[0].scenario.name
-baseline_result = next(r for r in results if r.scenario.name == baseline_name)
-rows = compare_scenarios(results, baseline_name=baseline_name)
+saved_results = [run_scenario(FITTED, s) for s in st.session_state.scenarios.values()]
+baseline_name = "Plan" if "Plan" in st.session_state.scenarios else saved_results[0].scenario.name
 
-draft_vs_baseline = draft_result.total_revenue / baseline_result.total_revenue - 1
+# Every visual below reflects both saved scenarios and the live draft, so an
+# edit in the sidebar is visible everywhere, not just in the headline cards.
+all_results = saved_results + [draft_result]
+rows = compare_scenarios(all_results, baseline_name=baseline_name)
+rows_by_name = {row.name: row for row in rows}
+draft_row = rows_by_name[draft_scenario.name]
 
 st.caption(copy.HEADLINE_SECTION_CAPTION.format(baseline=baseline_name))
 metric_cols = st.columns(4)
-metric_cols[0].metric(copy.HEADLINE_TOTAL_REVENUE, format_currency(draft_result.total_revenue))
-metric_cols[1].metric(copy.HEADLINE_TOTAL_SPEND, format_currency(draft_result.total_spend))
-metric_cols[2].metric(copy.HEADLINE_REVENUE_PER_SPEND, f"€{draft_result.revenue_per_spend:.2f}")
-metric_cols[3].metric(copy.HEADLINE_VS_BASELINE, format_percent(draft_vs_baseline, signed=True))
+metric_cols[0].metric(copy.HEADLINE_TOTAL_REVENUE, format_currency(draft_row.total_revenue))
+metric_cols[1].metric(copy.HEADLINE_TOTAL_SPEND, format_currency(draft_row.total_spend))
+metric_cols[2].metric(copy.HEADLINE_REVENUE_PER_SPEND, f"€{draft_row.revenue_per_spend:.2f}")
+metric_cols[3].metric(copy.HEADLINE_VS_BASELINE, format_percent(draft_row.delta_vs_baseline, signed=True))
+
+forecast_fig = build_forecast_chart(HISTORY, FORECAST_MONTHS, saved_results, draft_result)
+st.plotly_chart(forecast_fig, use_container_width=True)
 
 st.subheader(copy.CHART_COMPARE_TITLE)
 comparison_table = pd.DataFrame(
@@ -220,9 +219,9 @@ comparison_table = pd.DataFrame(
             copy.HEADLINE_REVENUE_PER_SPEND: f"€{row.revenue_per_spend:.2f}",
             copy.HEADLINE_VS_BASELINE: format_percent(row.delta_vs_baseline, signed=True),
         }
-        for result, row in zip(results, rows)
+        for result, row in zip(all_results, rows)
     ]
 )
 st.dataframe(comparison_table, hide_index=True, use_container_width=True)
-if any(result.guardrail_breaches for result in results):
+if any(result.guardrail_breaches for result in all_results):
     st.caption(copy.GUARDRAIL_SCENARIO_FOOTNOTE)

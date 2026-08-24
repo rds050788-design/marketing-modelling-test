@@ -80,6 +80,32 @@ for liveness, and only then runs `AppTest` — so "verified" means the live
 server was rebuilt from current disk state, not just that an isolated
 subprocess happened to read the right files.
 
+### Draft/saved split broke live-edit propagation to visuals
+
+While building the forecast chart, the AI computed the live sidebar draft as
+a separate `draft_result` object, wired it into the headline metric cards,
+and left the chart, comparison table, and guardrail-scenario footnote
+reading only from `st.session_state.scenarios` (the saved presets). Editing
+the budget moved the headline cards but not the chart line, the comparison
+table, or the guardrail marker on the draft -- three of four places a
+scenario's numbers are shown silently ignored the thing the user was
+actually editing.
+
+**Caught by the user manually interacting with the running app, not by the
+test suite** -- `AppTest` had already run clean against this exact code
+(the chart rendered, had the right trace count, no exceptions) because it
+only checked structural presence, never that the chart actually responds to
+a changed input. Fixed by computing one `all_results = saved_results +
+[draft_result]` list that every visual (chart, table, footnote) reads from,
+so there is a single source of truth instead of three parallel readings
+of "the current scenario." Verification for this fix used a different
+method deliberately: `src/charts.py`'s chart-building logic was extracted
+out of `app.py` into a Streamlit-free module specifically so a real pytest
+test (`tests/test_charts.py`) could call it directly with two different
+draft budgets and assert the resulting chart line actually differs --
+proving the fix with a genuine data-flow check rather than another
+structural-presence pass.
+
 ### Build order: risk-first over dependency-first
 
 The AI proposed a bottom-up build order by dependency: `copy.py` →

@@ -94,7 +94,7 @@ HEADLINE_TOTAL_REVENUE = "Total 12-month revenue"
 HEADLINE_TOTAL_SPEND = "Total marketing spend"
 HEADLINE_REVENUE_PER_SPEND = "Revenue per €1 spent"
 HEADLINE_VS_BASELINE = "Change vs the baseline scenario"
-HEADLINE_DRAFT_SCENARIO_LABEL = "Current plan"
+HEADLINE_DRAFT_SCENARIO_LABEL = "Current plan (unsaved)"
 HEADLINE_SECTION_CAPTION = "Your current plan, compared to the {baseline} scenario"
 
 # --- Charts (section 6, items 2-4) ------------------------------------------
@@ -102,6 +102,7 @@ HEADLINE_SECTION_CAPTION = "Your current plan, compared to the {baseline} scenar
 CHART_FORECAST_TITLE = "Revenue forecast"
 CHART_FORECAST_HISTORY_LABEL = "History"
 CHART_FORECAST_LIKELY_RANGE_LABEL = "Likely range"
+CHART_UPLIFT_DEFAULT_NOTE = "Game initiative"
 CHART_COMPARE_TITLE = "Compare scenarios"
 CHART_DRIVERS_TITLE = "Where revenue comes from"
 CHART_DRIVERS_BASE_LABEL = "Base business"
