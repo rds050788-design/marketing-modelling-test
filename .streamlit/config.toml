@@ -1,0 +1,16 @@
+# Pins an explicit theme so every viewer sees the same thing. Streamlit
+# otherwise follows each viewer's OS/browser preference, so without this the
+# app renders light for some reviewers and dark for others -- the chart
+# palette in src/theme.py is chosen and contrast-checked against exactly
+# this dark surface, not "works on either."
+#
+# Caveat: a viewer can still manually override this via the app's own
+# Settings menu (top right). Streamlit does not provide a server-side way
+# to lock that out.
+
+[theme]
+base = "dark"
+backgroundColor = "#0d0d0d"
+secondaryBackgroundColor = "#1a1a19"
+textColor = "#ffffff"
+primaryColor = "#3987e5"

@@ -9,16 +9,15 @@ import plotly.graph_objects as go
 
 from src import copy
 from src.formatting import format_currency
-
-SCENARIO_COLORS = ["#3b82f6", "#f97316", "#10b981", "#a855f7", "#ef4444", "#14b8a6"]
-DRAFT_COLOR = "#111827"  # reserved for the live draft; never reused for a saved scenario
-
-# Fixed roles for the revenue-driver decomposition (section 6, item 4) --
-# these are component colours, not scenario colours: every bar uses the
-# same three, so "base business" reads as the same colour on every scenario.
-BASE_SEGMENT_COLOR = "#475569"
-MARKETING_SEGMENT_COLOR = "#3b82f6"
-INITIATIVES_SEGMENT_COLOR = "#f59e0b"
+from src.theme import (
+    BASE_SEGMENT_COLOR,
+    DRAFT_COLOR,
+    HISTORY_LINE_COLOR,
+    INITIATIVES_SEGMENT_COLOR,
+    MARKER_OUTLINE_COLOR,
+    MARKETING_SEGMENT_COLOR,
+    SCENARIO_COLORS,
+)
 
 
 def display_name(result) -> str:
@@ -55,7 +54,7 @@ def build_forecast_chart(history, forecast_months, saved_results: list, draft_re
             y=history["total_revenue"],
             mode="lines",
             name=copy.CHART_FORECAST_HISTORY_LABEL,
-            line=dict(color="#6b7280", width=2),
+            line=dict(color=HISTORY_LINE_COLOR, width=2),
             text=[format_currency(v) for v in history["total_revenue"]],
             hovertemplate="%{x|%b %Y}<br>%{text}<extra>" + copy.CHART_FORECAST_HISTORY_LABEL + "</extra>",
         )
@@ -106,7 +105,7 @@ def build_forecast_chart(history, forecast_months, saved_results: list, draft_re
                     x=ux,
                     y=uy,
                     mode="markers",
-                    marker=dict(size=11, symbol="star", color=color, line=dict(width=1, color="white")),
+                    marker=dict(size=11, symbol="star", color=color, line=dict(width=1, color=MARKER_OUTLINE_COLOR)),
                     name=f"{name} initiatives",
                     text=texts,
                     hovertemplate="%{text}<extra></extra>",

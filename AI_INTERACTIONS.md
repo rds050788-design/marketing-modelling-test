@@ -54,6 +54,42 @@ revert, confirm the suite is clean again — before being reported as
 protecting against that class of bug. Done again for the visual-4
 decomposition-sum test (see Overrides).
 
+### Palette assumed a light background
+
+After all four checkpoint-5 visuals were built, the user reported the
+draft's line colour (`#111827`, near-black) was invisible against Streamlit's
+default dark theme. The AI had only ever looked at the app under its own
+light-mode assumption and never checked a dark render.
+
+Root cause was broader than one hex: every chart colour across all four
+visuals (`SCENARIO_COLORS`, the segment colours, the history line, a
+hardcoded `"white"` marker outline) had been picked by eye against a light
+background, and Streamlit follows each viewer's OS/browser preference by
+default -- so the same app renders light for some reviewers and dark for
+others, and nothing had been checked against the dark case at all.
+
+Fix: loaded the `dataviz` skill for its validated categorical palette
+(pre-checked for CVD-safe separation and contrast on both a light and dark
+reference surface) rather than hand-picking replacement hex values the same
+way the original colours were picked. No JS runtime was available in this
+environment to run the skill's own validator script, so the draft colour and
+the app's own additions (segment colours, history line, marker outline) were
+contrast-checked directly via the WCAG luminance-contrast formula in Python
+instead. Moved every chart colour into a new `src/theme.py`, and pinned an
+explicit dark theme in `.streamlit/config.toml` -- both requested by name.
+
+Pinning the theme is not just a convenience here: computed contrast shows
+white has 17.4:1 contrast on the dark surface but only 1.03:1 on a light one
+-- no single flat colour has strong contrast against both a near-black and a
+near-white surface, so "reads on both light and dark themes" is only true in
+practice because the pin ensures just one surface ever actually renders.
+Dark was chosen because the user's own fix language ("near-white or a
+bright neutral") only makes sense as a choice if dark is the pinned surface;
+this reasoning was inferred rather than confirmed, and is stated plainly
+here rather than left implicit. A residual gap: a viewer can still manually
+switch themes via Streamlit's own Settings menu, and there is no
+server-side way to prevent that.
+
 ---
 
 ## Overrides
