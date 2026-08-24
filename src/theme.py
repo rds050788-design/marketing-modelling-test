@@ -49,7 +49,9 @@ DRAFT_COLOR = "#ffffff"
 # of which scenarios are on screen. Base is deliberately muted so the
 # marketing/initiatives segments read as the smaller, secondary slivers
 # they are -- the model's central finding, made visible.
-BASE_SEGMENT_COLOR = "#c3c2b7"  # muted warm gray, 9.72:1 on dark surface
+BASE_SEGMENT_COLOR = "#767570"  # mid slate -- deliberately unsaturated and not near-white,
+# so it never reads as "the draft's colour"; 3.77:1 on dark surface, still clearly
+# visible as a large fill without competing with the two vivid, saturated slivers
 MARKETING_SEGMENT_COLOR = "#3987e5"  # categorical slot 1 (blue)
 INITIATIVES_SEGMENT_COLOR = "#d95926"  # categorical slot 2 (orange)
 
