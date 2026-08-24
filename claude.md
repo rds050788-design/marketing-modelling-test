@@ -78,7 +78,7 @@ Model in growth rates. Differencing detrends both series and breaks the confound
 
 | Parameter | Fitted | p-value | Meaning |
 |---|---|---|---|
-| β0 | 0.048 | — | baseline monthly growth, no extra marketing |
+| β0 | 0.035 | — | baseline monthly growth, no extra marketing |
 | β1 | 0.301 | 0.0007 | same-month response to spend change |
 | β2 | 0.208 | 0.0127 | following-month carryover |
 
@@ -170,7 +170,7 @@ regression, MAPE, R², bootstrap, significance. These live in one collapsed
 | Internal | User-facing wording |
 |---|---|
 | Elasticity 0.19 | "Every 10% more marketing adds roughly 2% more revenue that month" |
-| Baseline growth 4.8% | "Revenue grows about 5% a month on its own, without extra marketing" |
+| Baseline growth 3.5% | "Revenue grows about 3.5% a month on its own, without extra marketing" |
 | Lagged spend term | "Marketing keeps working into the following month" |
 | 90% bootstrap interval | "Likely range" |
 | Backtest MAPE 0.82% | "Tested against the last 8 months, forecasts landed within about 1%" |
@@ -265,7 +265,7 @@ is acceptable and not worth engineering around. Note it in the README.
    incrementality experiment. This is correlation under a detrending assumption, not
    proven causation.
 4. Baseline growth is assumed to continue at the fitted rate. It is user-adjustable
-   because ~5%/month compounds to ~80%/year, which is a strong assumption over a
+   because ~3.5%/month compounds to ~51%/year, which is a strong assumption over a
    12-month horizon.
 5. No seasonality is modelled — not estimable from 21 months, and no December spike
    is present in the data.
@@ -326,20 +326,41 @@ the ~20 minute mark. Never debug deployment at the end of a time budget.
 
 ## 10. Production note for the README
 
-> The dataset provided is synthetic, so this tool is deployed to a public Space for
-> evaluation convenience — the VP opens a URL, no installation required.
+## 10. Deployment note for the README
+
+> The dataset provided is synthetic, so the tool is deployed to Streamlit
+> Community Cloud for evaluation convenience — the VP opens a link, no
+> installation required. Three launch paths are available:
 >
-> In a real deployment the identical container would run on internal infrastructure:
-> a private service inside the company VPC (ECS/Fargate, Cloud Run with internal
-> ingress, or an internal Kubernetes namespace), behind SSO, with no public ingress.
-> Revenue and marketing spend are commercially sensitive and would not leave the
-> corporate network. The application layer is unchanged — that is the point of
-> containerizing it. What changes is the registry, the ingress rules, and an auth
-> proxy.
+> | Audience | Action | Requirement |
+> |---|---|---|
+> | VP of Product | Opens the hosted link | None |
+> | Interview panel | `docker build && docker run` | Docker |
+> | Anyone with Python | Double-click `run.bat` / `run.sh` | Python 3.12 |
 >
-> Historical data would be read from the warehouse rather than a bundled CSV, the model
-> refit on a monthly cadence as actuals land, and saved scenarios persisted to a
-> database rather than session state.
+> The application is containerized (see `Dockerfile`). Streamlit Community
+> Cloud performs its own containerization from `requirements.txt`, so the
+> hosted app and the local container are built from the same pinned
+> dependency set.
+>
+> In production the same application would run on internal infrastructure:
+> a private container service inside the company VPC (ECS/Fargate, Cloud Run
+> with internal ingress, or an internal Kubernetes namespace), behind SSO,
+> with no public ingress. Revenue and marketing spend are commercially
+> sensitive and would not leave the corporate network. Free public hosting
+> is an evaluation convenience, not a deployment recommendation. The
+> application layer is unchanged — that is the point of containerizing it.
+> What changes is the registry, the ingress rules, and an auth proxy.
+>
+> Historical data would be read from the warehouse rather than a bundled CSV,
+> the model refit on a monthly cadence as actuals land, and saved scenarios
+> persisted to a database rather than session state.
+
+Hosting notes: the free tier requires a public GitHub repository and provides
+roughly 1 GB of memory (ample for 21 rows and a two-parameter regression).
+Apps sleep after 12 hours without traffic, so the first visit after a quiet
+period takes about a minute to wake. Mention this in the README so a slow
+first load is not mistaken for a broken app.
 
 ---
 
@@ -373,23 +394,36 @@ No scikit-learn, no Prophet, no PyMC. Every dependency justified in one line.
 ## 13. Repo structure
 
 ```
-README.md            YAML frontmatter, hosted link first, then Docker, then assumptions
-AI_INTERACTIONS.md   curated prompts and where the AI was overridden
-decisions.md         anything changed after this record was frozen
-requirements.txt     pinned
-Dockerfile
-app.py               Streamlit UI only
+README.md hosted link first, then Docker, then run scripts, then assumptions
+AI_INTERACTIONS.md curated prompts and where the AI was overridden
+decisions.md anything changed after this record was frozen
+requirements.txt pinned
+Dockerfile port 8501
+.gitignore must NOT ignore data/dataset.csv
+.dockerignore excludes .git, .venv, caches — keeps tests/ in the image
+run.bat Windows: venv + install + launch + open browser
+run.sh macOS/Linux: same
+app.py Streamlit UI only
 src/
-  model.py           fit, forecast, bootstrap  (~60 lines)
-  scenarios.py       scenario objects, uplift application, comparison metrics
-  formatting.py      currency, dates, plain-language strings
-  copy.py            all user-facing text in one place
-data/dataset.csv
+model.py fit, forecast, bootstrap (~60 lines)
+scenarios.py scenario objects, uplift application, comparison metrics
+formatting.py currency, dates, number formatting
+copy.py all user-facing text in one place
+data/dataset.csv must be committed — the hosted build reads it from the repo
 tests/test_model.py
 ```
 
-`copy.py` exists so the plain-language rule is auditable in one file rather than
-scattered through the UI.
+
+`copy.py` exists so the plain-language rule (§5) is auditable in one file
+rather than scattered through the UI.
+
+`data/dataset.csv` is committed deliberately. Streamlit Community Cloud builds
+from the repository, so an ignored CSV produces a `FileNotFoundError` visible
+only in the deploy log.
+
+`tests/` is deliberately kept in the Docker image so the panel can run
+`docker run --entrypoint pytest <image>` and verify the fitted coefficients
+and backtest figures from §3 inside the container.
 
 ---
 
