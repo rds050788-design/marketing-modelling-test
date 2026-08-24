@@ -20,6 +20,6 @@ env/
 .idea/
 .DS_Store
 
-# Local exports
-*.xlsx
-!data/*.xlsx
+# Personal planning docs, not deliverables
+BUILD_RUNBOOK.md
+DECISION_RECORD.md
