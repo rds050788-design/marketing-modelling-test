@@ -115,7 +115,13 @@ def check_guardrails(fitted: FittedModel, monthly_budget) -> list:
     mom_lo, mom_hi = fitted.mom_change_range
     spend_history = [fitted.last_spend] + list(monthly_budget)
     for i in range(1, len(spend_history)):
-        change = spend_history[i] / spend_history[i - 1] - 1
+        prev_spend, curr_spend = spend_history[i - 1], spend_history[i]
+        if prev_spend <= 0 or curr_spend <= 0:
+            # A month-over-month percentage change is undefined when either
+            # side is zero (or negative). Skip the comparison for that
+            # transition rather than divide by zero.
+            continue
+        change = curr_spend / prev_spend - 1
         if change < mom_lo or change > mom_hi:
             breaches.append(GuardrailBreach(month=i, kind="mom_change", value=float(change)))
 
@@ -140,6 +146,9 @@ def run_scenario(fitted: FittedModel, scenario: Scenario) -> ScenarioResult:
 
     total_spend = float(np.sum(scenario.monthly_budget))
     total_revenue = float(np.sum(displayed))
+    # Revenue per euro spent is undefined with no spend at all -- a zero
+    # budget (the draft's starting state) must not divide by zero here.
+    revenue_per_spend = total_revenue / total_spend if total_spend > 0 else 0.0
 
     return ScenarioResult(
         scenario=scenario,
@@ -151,7 +160,7 @@ def run_scenario(fitted: FittedModel, scenario: Scenario) -> ScenarioResult:
         from_initiatives=from_initiatives,
         total_revenue=total_revenue,
         total_spend=total_spend,
-        revenue_per_spend=total_revenue / total_spend,
+        revenue_per_spend=revenue_per_spend,
         guardrail_breaches=check_guardrails(fitted, scenario.monthly_budget),
     )
 

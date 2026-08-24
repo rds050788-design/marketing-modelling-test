@@ -86,7 +86,22 @@ def _growth_path(fitted: FittedModel, monthly_budget, baseline_growth: float | N
     """Deterministic monthly log-growth rate implied by a budget vector."""
     beta0 = fitted.intercept if baseline_growth is None else baseline_growth
     spend_history = np.concatenate([[fitted.last_spend], np.asarray(monthly_budget, dtype=float)])
-    d_log_spend = np.diff(np.log(spend_history))
+
+    # log(0) is -inf and log(negative) is nan; the diff of two such values
+    # is itself nan. Both are numpy warnings, not exceptions, but suppress
+    # them deliberately since the values are about to be masked out anyway
+    # -- the warning would otherwise look like an unhandled edge case.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_spend = np.log(spend_history)
+        d_log_spend = np.diff(log_spend)
+
+    # A month-over-month change touching a zero (or negative) spend month
+    # has no defined value. Those transitions fall back to no marketing
+    # contribution -- baseline growth alone -- rather than propagate
+    # -inf/nan through the rest of the forecast.
+    undefined = (spend_history[:-1] <= 0) | (spend_history[1:] <= 0)
+    d_log_spend = np.where(undefined, 0.0, d_log_spend)
+
     d_log_spend_lag1 = np.concatenate([[fitted.last_d_log_spend], d_log_spend[:-1]])
     return beta0 + fitted.same_month_coef * d_log_spend + fitted.carryover_coef * d_log_spend_lag1
 

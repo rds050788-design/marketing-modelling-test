@@ -68,7 +68,7 @@ def uplifts_from_editor(df: pd.DataFrame) -> list:
 if "scenarios" not in st.session_state:
     st.session_state.scenarios = preset_scenarios()
 if "draft_budget" not in st.session_state:
-    st.session_state.draft_budget = default_budget(1.0)
+    st.session_state.draft_budget = [0] * FORECAST_HORIZON
 if "draft_uplifts_df" not in st.session_state:
     st.session_state.draft_uplifts_df = pd.DataFrame(
         columns=[
@@ -138,19 +138,24 @@ with st.sidebar:
 
     scale_col, apply_col = st.columns([2, 1])
     with scale_col:
-        scale_pct = st.number_input(copy.BUDGET_SCALE_LABEL, value=0, step=5, help=copy.BUDGET_SCALE_HELP)
+        scale_pct = st.number_input(
+            copy.BUDGET_SCALE_LABEL, value=0, min_value=-100, step=5, help=copy.BUDGET_SCALE_HELP
+        )
     with apply_col:
         st.write("")
         st.write("")
         if st.button(copy.BUDGET_SCALE_APPLY_BUTTON, key="apply_scale"):
             factor = 1 + scale_pct / 100
-            st.session_state.draft_budget = [round(b * factor) for b in st.session_state.draft_budget]
+            st.session_state.draft_budget = [max(0, round(b * factor)) for b in st.session_state.draft_budget]
             st.rerun()
 
     breaches = check_guardrails(FITTED, st.session_state.draft_budget)
+    has_zero_budget = any(b == 0 for b in st.session_state.draft_budget)
     spend_hi = any(b.kind == "spend_range" and b.value > FITTED.spend_range[1] for b in breaches)
-    spend_lo = any(b.kind == "spend_range" and b.value < FITTED.spend_range[0] for b in breaches)
+    spend_lo = any(b.kind == "spend_range" and 0 < b.value < FITTED.spend_range[0] for b in breaches)
     mom_out = any(b.kind == "mom_change" for b in breaches)
+    if has_zero_budget:
+        st.warning(copy.GUARDRAIL_ZERO_BUDGET)
     if spend_hi:
         st.warning(copy.GUARDRAIL_SPEND_TOO_HIGH)
     if spend_lo:

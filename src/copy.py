@@ -16,7 +16,8 @@ APP_TAGLINE = "Forecast next year's revenue under different marketing budgets an
 WELCOME_TITLE = "This tool forecasts revenue for the next 12 months."
 WELCOME_STEPS = [
     "Three example scenarios are already loaded. The chart compares them.",
-    "Change the marketing budget in the table on the left — type any monthly figure.",
+    "Your plan starts blank — type a monthly marketing figure in the table on the "
+    "left to begin building it.",
     "Add a game initiative and choose whether it permanently lifts revenue or is a "
     "one-month spike.",
     "Save it as a new scenario to compare against the others.",
@@ -80,6 +81,10 @@ SAVE_SCENARIO_BUTTON = "Save scenario"
 
 GUARDRAIL_SPEND_TOO_HIGH = "This budget is far larger than anything tried before — treat with caution"
 GUARDRAIL_SPEND_TOO_LOW = "This budget is far smaller than anything tried before — treat with caution"
+GUARDRAIL_ZERO_BUDGET = (
+    "A €0 budget is far outside the range this model was built on, so that month's "
+    "forecast reflects your baseline growth only — not a modelled marketing effect."
+)
 GUARDRAIL_MOM_CHANGE = (
     "This is a much bigger month-to-month change in spend than we've seen before — "
     "treat with caution"

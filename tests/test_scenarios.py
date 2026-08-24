@@ -116,6 +116,57 @@ def test_comparison_metrics_and_delta_vs_baseline(fitted, flat_budget):
     )
 
 
+# --- Zero-budget crash chain (ZeroDivisionError in check_guardrails, then
+# log(0) undefined in the growth model) -- none of these may raise. ---
+
+
+def test_check_guardrails_zero_in_one_month_does_not_raise(fitted, flat_budget):
+    budget = list(flat_budget)
+    budget[5] = 0
+    breaches = check_guardrails(fitted, budget)  # must not raise ZeroDivisionError
+    assert any(b.kind == "spend_range" and b.month == 6 for b in breaches)
+
+
+def test_check_guardrails_zero_in_all_months_does_not_raise(fitted):
+    breaches = check_guardrails(fitted, [0] * 12)  # must not raise ZeroDivisionError
+    assert len(breaches) == 12  # every month flagged as below the observed spend range
+    assert all(b.kind == "spend_range" for b in breaches)
+
+
+def test_check_guardrails_negative_budget_does_not_raise(fitted, flat_budget):
+    budget = list(flat_budget)
+    budget[3] = -1_000_000
+    breaches = check_guardrails(fitted, budget)  # must not raise
+    assert any(b.kind == "spend_range" and b.month == 4 for b in breaches)
+
+
+def test_run_scenario_zero_in_one_month_does_not_raise_and_stays_finite(fitted, flat_budget):
+    budget = list(flat_budget)
+    budget[5] = 0
+    result = run_scenario(fitted, Scenario(name="ZeroMonth", monthly_budget=budget))
+    assert np.all(np.isfinite(result.revenue))
+    assert np.all(np.isfinite(result.lower))
+    assert np.all(np.isfinite(result.upper))
+
+
+def test_run_scenario_zero_in_all_months_does_not_raise_and_falls_back_to_baseline(fitted):
+    result = run_scenario(fitted, Scenario(name="AllZero", monthly_budget=[0] * 12))
+    assert np.all(np.isfinite(result.revenue))
+    assert result.total_spend == 0.0
+    assert result.revenue_per_spend == 0.0
+    # With no spend anywhere, the marketing term is undefined at every
+    # transition and falls back to baseline growth alone -- revenue should
+    # match the baseline-only counterfactual exactly, not diverge from it.
+    np.testing.assert_allclose(result.revenue, result.base_business, rtol=1e-9)
+
+
+def test_run_scenario_negative_budget_does_not_raise(fitted, flat_budget):
+    budget = list(flat_budget)
+    budget[0] = -500_000
+    result = run_scenario(fitted, Scenario(name="Negative", monthly_budget=budget))
+    assert np.all(np.isfinite(result.revenue))
+
+
 def test_guardrail_flags_out_of_range_spend(fitted):
     spend_lo, spend_hi = fitted.spend_range
     over_budget = [spend_hi * 2] * 12
