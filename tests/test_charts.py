@@ -12,7 +12,7 @@ than requiring a person to notice it in the browser.
 import pandas as pd
 import pytest
 
-from src.charts import build_comparison_chart, build_forecast_chart, display_name
+from src.charts import build_comparison_chart, build_driver_chart, build_forecast_chart, display_name
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import Scenario, Uplift, run_scenario
 
@@ -117,3 +117,29 @@ def test_comparison_chart_marks_out_of_range_scenario(fitted):
     assert "Aggressive *" in names
     assert display_name(clean_draft) in names
     assert not display_name(clean_draft).endswith("*")
+
+
+def test_driver_chart_segments_sum_to_scenario_totals(fitted):
+    saved = [
+        run_scenario(fitted, Scenario(name="Conservative", monthly_budget=[fitted.last_spend * 0.9] * FORECAST_HORIZON)),
+        run_scenario(fitted, Scenario(name="Plan", monthly_budget=[fitted.last_spend] * FORECAST_HORIZON)),
+    ]
+    draft = run_scenario(
+        fitted,
+        Scenario(
+            name="Draft",
+            monthly_budget=[fitted.last_spend * 1.15] * FORECAST_HORIZON,
+            uplifts=[Uplift(month=4, pct=0.12, note="Test initiative")],
+        ),
+    )
+
+    fig = build_driver_chart(saved, draft)
+    base_trace, marketing_trace, initiatives_trace = fig.data
+
+    names = list(base_trace.y)
+    assert names == [display_name(r) for r in saved] + [display_name(draft)]
+
+    all_results = saved + [draft]
+    for i, result in enumerate(all_results):
+        segment_sum = base_trace.x[i] + marketing_trace.x[i] + initiatives_trace.x[i]
+        assert segment_sum == pytest.approx(result.total_revenue, rel=1e-9)

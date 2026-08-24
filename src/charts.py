@@ -13,6 +13,13 @@ from src.formatting import format_currency
 SCENARIO_COLORS = ["#3b82f6", "#f97316", "#10b981", "#a855f7", "#ef4444", "#14b8a6"]
 DRAFT_COLOR = "#111827"  # reserved for the live draft; never reused for a saved scenario
 
+# Fixed roles for the revenue-driver decomposition (section 6, item 4) --
+# these are component colours, not scenario colours: every bar uses the
+# same three, so "base business" reads as the same colour on every scenario.
+BASE_SEGMENT_COLOR = "#475569"
+MARKETING_SEGMENT_COLOR = "#3b82f6"
+INITIATIVES_SEGMENT_COLOR = "#f59e0b"
+
 
 def display_name(result) -> str:
     """Scenario name, flagged with the guardrail marker if its budget goes
@@ -147,6 +154,60 @@ def build_comparison_chart(saved_results: list, draft_result) -> go.Figure:
         xaxis=dict(tickprefix="€", tickformat="~s"),
         yaxis=dict(autorange="reversed"),
         showlegend=False,
+        margin=dict(t=60),
+    )
+    return fig
+
+
+def build_driver_chart(saved_results: list, draft_result) -> go.Figure:
+    """Stacked bars splitting each scenario's 12-month total into base
+    business, from marketing, and from initiatives (section 6, item 4).
+
+    Decomposition (see decisions.md): base business is baseline growth
+    compounding from the last actual month, with a flat budget held at the
+    last observed level and no initiatives. From marketing is the
+    difference between the scenario's actual budget path and that
+    flat-budget counterfactual, initiatives excluded. From initiatives is
+    the uplift contribution on top. The three always sum to the scenario's
+    total revenue (see ScenarioResult / run_scenario in src/scenarios.py,
+    and tests/test_scenarios.py for the summation guarantee).
+
+    Aggregated per scenario, not per month: the VP is choosing between
+    plans, so this chart answers "why does this one win" -- the composition
+    of the difference between scenarios -- rather than explaining the
+    model's month-to-month mechanism.
+    """
+    results = list(saved_results) + [draft_result]
+    names = [display_name(r) for r in results]
+    base = [float(r.base_business.sum()) for r in results]
+    marketing = [float(r.from_marketing.sum()) for r in results]
+    initiatives = [float(r.from_initiatives.sum()) for r in results]
+
+    fig = go.Figure()
+    for label, values, color in (
+        (copy.CHART_DRIVERS_BASE_LABEL, base, BASE_SEGMENT_COLOR),
+        (copy.CHART_DRIVERS_MARKETING_LABEL, marketing, MARKETING_SEGMENT_COLOR),
+        (copy.CHART_DRIVERS_INITIATIVES_LABEL, initiatives, INITIATIVES_SEGMENT_COLOR),
+    ):
+        fig.add_trace(
+            go.Bar(
+                name=label,
+                x=values,
+                y=names,
+                orientation="h",
+                marker=dict(color=color),
+                text=[format_currency(v) for v in values],
+                textposition="auto",
+                hovertemplate="%{y}<br>" + label + ": %{text}<extra></extra>",
+            )
+        )
+
+    fig.update_layout(
+        title=copy.CHART_DRIVERS_TITLE,
+        barmode="relative",
+        xaxis=dict(tickprefix="€", tickformat="~s"),
+        yaxis=dict(autorange="reversed"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
         margin=dict(t=60),
     )
     return fig

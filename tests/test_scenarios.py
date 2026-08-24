@@ -77,6 +77,28 @@ def test_decomposition_sums_to_displayed_revenue(fitted, flat_budget):
     np.testing.assert_allclose(reconstructed, result.revenue, rtol=1e-9)
 
 
+@pytest.mark.parametrize(
+    "name,multiplier,uplifts",
+    [
+        ("Conservative", 0.9, []),
+        ("Plan", 1.0, []),
+        ("Aggressive", 1.15, []),
+        ("Draft", 1.05, [Uplift(4, 0.12, PERMANENT, "Test initiative")]),
+    ],
+)
+def test_decomposition_sums_to_total_for_every_default_scenario(fitted, name, multiplier, uplifts):
+    # Guards the revenue-driver chart's decomposition (CLAUDE.md section 6,
+    # item 4): base business + from marketing + from initiatives must equal
+    # the scenario total, for every scenario the app pre-seeds plus a draft
+    # carrying an uplift -- both per month and summed over the horizon.
+    budget = [fitted.last_spend * multiplier] * 12
+    result = run_scenario(fitted, Scenario(name=name, monthly_budget=budget, uplifts=uplifts))
+
+    reconstructed = result.base_business + result.from_marketing + result.from_initiatives
+    np.testing.assert_allclose(reconstructed, result.revenue, rtol=1e-9)
+    assert reconstructed.sum() == pytest.approx(result.total_revenue, rel=1e-9)
+
+
 def test_comparison_metrics_and_delta_vs_baseline(fitted, flat_budget):
     aggressive_budget = [b * 1.3 for b in flat_budget]
     baseline = Scenario(name="Baseline", monthly_budget=flat_budget)

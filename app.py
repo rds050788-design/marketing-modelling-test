@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src import copy
-from src.charts import build_comparison_chart, build_forecast_chart, display_name
+from src.charts import build_comparison_chart, build_driver_chart, build_forecast_chart, display_name
 from src.formatting import format_currency, format_date, format_percent
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import ONE_MONTH, PERMANENT, Scenario, Uplift, check_guardrails, compare_scenarios, run_scenario
@@ -228,3 +228,7 @@ comparison_table = pd.DataFrame(
 st.dataframe(comparison_table, hide_index=True, use_container_width=True)
 if any(result.guardrail_breaches for result in all_results):
     st.caption(copy.GUARDRAIL_SCENARIO_FOOTNOTE)
+
+st.subheader(copy.CHART_DRIVERS_TITLE)
+driver_fig = build_driver_chart(saved_results, draft_result)
+st.plotly_chart(driver_fig, use_container_width=True)

@@ -23,8 +23,36 @@ link, `docker build && docker run`, and `run.bat` / `run.sh`.
 
 ## Build
 
-_Entries are added at each remaining checkpoint, covering anything the user
-corrected or any decision that could reasonably have gone another way._
+### Verification recovery
+
+Across checkpoint 5's first two visuals, the AI reported completion twice on
+verification that had not actually run against the thing being verified: an
+`AppTest` subprocess that read correct files while the live server serving
+`localhost:8501` was stale (see the stale live-server entry below), and then
+a chart that structurally rendered but never received the live draft (see
+the draft/saved split entry below) — the second bug slipped past `AppTest`
+for a different reason than the first: not stale process state this time,
+but a test that only checked "does it render," never "does it react to a
+changed input."
+
+After the second miss, the AI's response changed in kind: rather than
+substitute another `AppTest` run and call it equivalent to what the user
+asked for ("not AppTest — a real interaction"), it stated the actual
+limitation plainly — no browser automation available in this session — and
+built a different kind of verification instead of a differently-labelled
+same kind. It extracted the chart-building logic out of `app.py` into a
+Streamlit-free module (`src/charts.py`) specifically so a real pytest test
+could call the exact production function with two different budgets and
+assert the output differs — a data-flow check, not a structural one. It then
+proved that test wasn't vacuous by temporarily reintroducing the original
+bug and confirming the new test failed against it, before reverting.
+
+This is the point the verification practice changed for the rest of the
+build: every new regression test added from here on is mutation-checked —
+temporarily reintroduce the bug it targets, confirm the test fails,
+revert, confirm the suite is clean again — before being reported as
+protecting against that class of bug. Done again for the visual-4
+decomposition-sum test (see Overrides).
 
 ---
 
@@ -105,6 +133,44 @@ test (`tests/test_charts.py`) could call it directly with two different
 draft budgets and assert the resulting chart line actually differs --
 proving the fix with a genuine data-flow check rather than another
 structural-presence pass.
+
+### Visual 4 scope: aggregate per-scenario decomposition, not monthly
+
+For the revenue-driver chart (section 6, item 4 — "the chart that carries
+the model's central finding"), the AI recommended decomposing a single
+scenario's revenue month by month, reasoning that this most directly shows
+the mechanism behind the model's central finding (base business dominates
+every month). The user overrode this in favor of aggregate, per-scenario
+decomposition — one stacked bar per scenario (Conservative/Plan/Aggressive/
+draft), each split into the same three components, summed over the full 12
+months.
+
+**Reason:** the user is choosing between plans, so the chart must answer
+"why does this one win" — the composition of the *difference* between
+scenarios. Monthly composition explains the model's mechanism, which is a
+concern for the analyst who built the model, not for the decision-maker
+using it. The chosen version is also a natural extension of visual 3: same
+scenarios, same ordering, now split into components instead of a single
+total.
+
+**Decomposition definitions used** (implemented in `run_scenario`,
+`src/scenarios.py`, unchanged by this override — only the chart's
+aggregation level changed):
+
+- **Base business** — baseline growth compounding from the last actual
+  month, with a flat budget held at the last observed level and no
+  initiatives.
+- **From marketing** — the difference between the scenario's actual budget
+  path and that flat-budget counterfactual, initiatives excluded.
+- **From initiatives** — the uplift contribution on top.
+
+The three are guaranteed to sum to the scenario's total revenue by
+construction (each is a running difference against the next). Tested for
+Conservative, Plan, Aggressive, and a draft carrying an uplift in
+`tests/test_scenarios.py::test_decomposition_sums_to_total_for_every_default_scenario`
+and at the chart-trace level in
+`tests/test_charts.py::test_driver_chart_segments_sum_to_scenario_totals`;
+both were mutation-checked (see Verification recovery, above).
 
 ### Build order: risk-first over dependency-first
 
