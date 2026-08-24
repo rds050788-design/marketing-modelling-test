@@ -18,6 +18,7 @@ import json
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from src import copy
 from src.model import fit_model, load_history
 
 
@@ -31,15 +32,24 @@ def _run_with_draft_budget(budget):
     return at
 
 
-def _draft_chart_trace(at):
+def _draft_line_traces(at):
+    # The draft's forecast may be split into multiple line segments if part
+    # of it is flagged unreliable (see src/charts.py's _line_segments) --
+    # filter to just the "lines+markers" segments (excludes the shaded
+    # range fills and any uplift star markers, which share a name prefix).
     chart = at.get("plotly_chart")[0]
     spec = json.loads(chart.proto.spec)
-    return spec["data"][-1]  # the draft is always added last, see src/charts.py
+    return [t for t in spec["data"] if "Current plan" in t.get("name", "") and t.get("mode") == "lines+markers"]
+
+
+def _draft_chart_trace(at):
+    # The segment covering the most recent (final) forecast month.
+    return _draft_line_traces(at)[-1]
 
 
 def _draft_table_row(at):
     table = at.dataframe[0].value
-    draft_rows = table[table["Scenario"].str.startswith("Current plan")]
+    draft_rows = table[table["Scenario"].str.contains("Current plan")]
     assert len(draft_rows) == 1
     return draft_rows.iloc[0]
 
@@ -79,8 +89,8 @@ def test_comparison_table_reacts_to_draft_budget_change_in_the_real_app(baseline
 def test_draft_guardrail_marker_appears_on_chart_and_table_when_draft_goes_out_of_range(baseline_budget):
     at = _run_with_draft_budget([b * 3 for b in baseline_budget])
 
-    assert _draft_chart_trace(at)["name"].endswith("*")
-    assert _draft_table_row(at)["Scenario"].endswith("*")
+    assert _draft_chart_trace(at)["name"].startswith(copy.GUARDRAIL_SCENARIO_MARKER)
+    assert _draft_table_row(at)["Scenario"].startswith(copy.GUARDRAIL_SCENARIO_MARKER)
 
 
 def test_fresh_app_load_with_zero_draft_budget_does_not_raise():

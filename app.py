@@ -1,8 +1,4 @@
-"""Revenue Scenario Planner -- Streamlit UI (CLAUDE.md section 6).
-
-This checkpoint covers the sidebar inputs, pre-seeded scenarios, and range
-guardrails. Charts, the tutorial, and export are added in later checkpoints.
-"""
+"""Revenue Scenario Planner -- Streamlit UI (CLAUDE.md section 6)."""
 
 import io
 
@@ -11,7 +7,7 @@ import streamlit as st
 
 from src import copy
 from src.charts import build_driver_chart, build_forecast_chart, display_name
-from src.formatting import format_currency, format_date, format_percent
+from src.formatting import format_currency, format_currency_range, format_date, format_percent
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import ONE_MONTH, PERMANENT, Scenario, Uplift, check_guardrails, compare_scenarios, run_scenario
 
@@ -34,6 +30,13 @@ FORECAST_MONTHS = pd.date_range(
 )
 MONTH_LABELS = [format_date(d) for d in FORECAST_MONTHS]
 MONTH_LABEL_TO_INDEX = {label: i + 1 for i, label in enumerate(MONTH_LABELS)}
+
+UPLIFT_EDITOR_COLUMNS = [
+    copy.INITIATIVES_MONTH_COLUMN,
+    copy.INITIATIVES_UPLIFT_COLUMN,
+    copy.INITIATIVES_MODE_COLUMN,
+    copy.INITIATIVES_NOTE_COLUMN,
+]
 
 
 def default_budget(multiplier: float) -> list:
@@ -65,19 +68,29 @@ def uplifts_from_editor(df: pd.DataFrame) -> list:
     return uplifts
 
 
+def uplifts_to_editor(uplifts: list) -> pd.DataFrame:
+    """Inverse of uplifts_from_editor -- rebuilds the editable table from a
+    scenario's Uplift objects, e.g. when loading a saved scenario."""
+    rows = [
+        {
+            copy.INITIATIVES_MONTH_COLUMN: MONTH_LABELS[u.month - 1],
+            copy.INITIATIVES_UPLIFT_COLUMN: u.pct * 100,
+            copy.INITIATIVES_MODE_COLUMN: (
+                copy.UPLIFT_MODE_PERMANENT if u.mode == PERMANENT else copy.UPLIFT_MODE_ONE_MONTH
+            ),
+            copy.INITIATIVES_NOTE_COLUMN: u.note,
+        }
+        for u in uplifts
+    ]
+    return pd.DataFrame(rows, columns=UPLIFT_EDITOR_COLUMNS)
+
+
 if "scenarios" not in st.session_state:
     st.session_state.scenarios = preset_scenarios()
 if "draft_budget" not in st.session_state:
     st.session_state.draft_budget = [0] * FORECAST_HORIZON
 if "draft_uplifts_df" not in st.session_state:
-    st.session_state.draft_uplifts_df = pd.DataFrame(
-        columns=[
-            copy.INITIATIVES_MONTH_COLUMN,
-            copy.INITIATIVES_UPLIFT_COLUMN,
-            copy.INITIATIVES_MODE_COLUMN,
-            copy.INITIATIVES_NOTE_COLUMN,
-        ]
-    )
+    st.session_state.draft_uplifts_df = pd.DataFrame(columns=UPLIFT_EDITOR_COLUMNS)
 if "draft_baseline_growth_pct" not in st.session_state:
     st.session_state.draft_baseline_growth_pct = round(FITTED.intercept * 100, 1)
 if "show_welcome" not in st.session_state:
@@ -103,15 +116,33 @@ if st.session_state.show_welcome:
                 st.rerun()
         with example_col:
             if st.button(copy.WELCOME_EXAMPLE_BUTTON, use_container_width=True):
-                st.session_state.scenarios[copy.WELCOME_EXAMPLE_SCENARIO_NAME] = Scenario(
-                    name=copy.WELCOME_EXAMPLE_SCENARIO_NAME,
-                    monthly_budget=default_budget(1.0),
-                    uplifts=[Uplift(month=6, pct=0.15, mode=PERMANENT, note=copy.WELCOME_EXAMPLE_UPLIFT_NOTE)],
+                st.session_state.draft_budget = default_budget(1.0)
+                st.session_state.draft_uplifts_df = uplifts_to_editor(
+                    [Uplift(month=6, pct=0.15, mode=PERMANENT, note=copy.WELCOME_EXAMPLE_UPLIFT_NOTE)]
                 )
                 st.session_state.show_welcome = False
                 st.rerun()
 
 with st.sidebar:
+    st.header(copy.LOAD_SCENARIO_SECTION_HEADER)
+    load_col, load_button_col = st.columns([3, 2])
+    with load_col:
+        scenario_to_load = st.selectbox(
+            copy.LOAD_SCENARIO_LABEL,
+            options=list(st.session_state.scenarios.keys()),
+            help=copy.LOAD_SCENARIO_HELP,
+            label_visibility="collapsed",
+        )
+    with load_button_col:
+        if st.button(copy.LOAD_SCENARIO_BUTTON, help=copy.LOAD_SCENARIO_BUTTON_HELP, use_container_width=True):
+            loaded = st.session_state.scenarios[scenario_to_load]
+            st.session_state.draft_budget = list(loaded.monthly_budget)
+            st.session_state.draft_uplifts_df = uplifts_to_editor(loaded.uplifts)
+            if loaded.baseline_growth is not None:
+                st.session_state.draft_baseline_growth_pct = round(loaded.baseline_growth * 100, 1)
+            st.rerun()
+
+    st.divider()
     st.header(copy.BUDGET_SECTION_HEADER)
 
     budget_df = pd.DataFrame(
@@ -163,6 +194,17 @@ with st.sidebar:
     if mom_out:
         st.warning(copy.GUARDRAIL_MOM_CHANGE)
 
+    st.divider()
+    baseline_growth_pct = st.number_input(
+        copy.BASELINE_GROWTH_LABEL,
+        value=st.session_state.draft_baseline_growth_pct,
+        step=0.1,
+        format="%.1f",
+        help=copy.BASELINE_GROWTH_HELP,
+    )
+    st.session_state.draft_baseline_growth_pct = baseline_growth_pct
+
+    st.divider()
     st.header(copy.INITIATIVES_SECTION_HEADER)
     st.caption(copy.INITIATIVES_TABLE_HELP)
 
@@ -190,15 +232,6 @@ with st.sidebar:
         key="uplifts_editor",
     )
     st.session_state.draft_uplifts_df = edited_uplifts_df
-
-    baseline_growth_pct = st.number_input(
-        copy.BASELINE_GROWTH_LABEL,
-        value=st.session_state.draft_baseline_growth_pct,
-        step=0.1,
-        format="%.1f",
-        help=copy.BASELINE_GROWTH_HELP,
-    )
-    st.session_state.draft_baseline_growth_pct = baseline_growth_pct
 
     st.divider()
     scenario_name = st.text_input(
@@ -240,16 +273,21 @@ metric_cols[1].metric(copy.HEADLINE_TOTAL_SPEND, format_currency(draft_row.total
 metric_cols[2].metric(copy.HEADLINE_REVENUE_PER_SPEND, f"€{draft_row.revenue_per_spend:.2f}")
 metric_cols[3].metric(copy.HEADLINE_VS_BASELINE, format_percent(draft_row.delta_vs_baseline, signed=True))
 
+st.caption(copy.CHART_FORECAST_CAPTION)
 forecast_fig = build_forecast_chart(HISTORY, FORECAST_MONTHS, saved_results, draft_result)
 st.plotly_chart(forecast_fig, use_container_width=True)
 
 st.subheader(copy.CHART_COMPARE_TITLE)
+st.caption(copy.CHART_COMPARE_CAPTION)
 comparison_table = pd.DataFrame(
     [
         {
             "Scenario": display_name(result),
             copy.HEADLINE_TOTAL_REVENUE: format_currency(row.total_revenue),
             copy.HEADLINE_TOTAL_SPEND: format_currency(row.total_spend),
+            copy.HEADLINE_MONTHLY_BUDGET_COLUMN: format_currency_range(
+                min(result.scenario.monthly_budget), max(result.scenario.monthly_budget)
+            ),
             copy.HEADLINE_REVENUE_PER_SPEND: f"€{row.revenue_per_spend:.2f}",
             copy.HEADLINE_VS_BASELINE: format_percent(row.delta_vs_baseline, signed=True),
             copy.CHART_DRIVERS_BASE_LABEL: format_currency(result.base_business.sum()),
@@ -289,5 +327,10 @@ st.download_button(
 )
 
 st.subheader(copy.CHART_DRIVERS_TITLE)
+st.caption(copy.CHART_DRIVERS_CAPTION)
 driver_fig = build_driver_chart(saved_results, draft_result)
 st.plotly_chart(driver_fig, use_container_width=True)
+
+with st.expander(copy.HOW_THIS_WORKS_HEADER):
+    for bullet in copy.HOW_THIS_WORKS_BULLETS:
+        st.markdown(f"- {bullet}")

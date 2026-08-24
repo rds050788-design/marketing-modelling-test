@@ -21,6 +21,15 @@ def format_currency(value: float) -> str:
     return f"{sign}€{value:.0f}"
 
 
+def format_currency_range(low: float, high: float) -> str:
+    """Formats a monthly currency range, e.g. (3_500_000, 3_500_000) ->
+    "€3.5M" when flat, or (3_500_000, 4_200_000) -> "€3.5M - €4.2M" when it
+    varies month to month."""
+    if low == high:
+        return format_currency(low)
+    return f"{format_currency(low)} - {format_currency(high)}"
+
+
 def format_date(value) -> str:
     """Formats a date as e.g. "Nov 2026", never "2026-11"."""
     return pd.Timestamp(value).strftime("%b %Y")

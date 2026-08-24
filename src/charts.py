@@ -19,12 +19,18 @@ from src.theme import (
     SCENARIO_COLORS,
 )
 
+# Presentation-only widening of the shown likely range for months whose
+# budget goes outside the range the model was ever tested on -- the point
+# forecast (revenue) is untouched; only how uncertain it *looks* changes.
+UNRELIABLE_RANGE_WIDEN_FACTOR = 2.0
+UNRELIABLE_OPACITY = 0.45
+
 
 def display_name(result) -> str:
-    """Scenario name, flagged with the guardrail marker if its budget goes
+    """Scenario name, flagged with a warning icon if its budget goes
     outside the tested range. Use this wherever a scenario name is shown."""
     if result.guardrail_breaches:
-        return f"{result.scenario.name} {copy.GUARDRAIL_SCENARIO_MARKER}"
+        return f"{copy.GUARDRAIL_SCENARIO_MARKER} {result.scenario.name}"
     return result.scenario.name
 
 
@@ -40,11 +46,37 @@ def scenario_colors(saved_results: list) -> list:
     return [SCENARIO_COLORS[i % len(SCENARIO_COLORS)] for i in range(len(saved_results))]
 
 
+def _line_segments(flags: list) -> list:
+    """Groups points into contiguous line segments by destination-point
+    reliability, so a segment ending at an out-of-range month is styled
+    differently from one that doesn't. flags[0] (the history anchor) is
+    always reliable. Adjacent segments share their boundary point so the
+    line still joins up with no visual gap. Returns (start, end, is_unreliable).
+    """
+    n = len(flags)
+    if n < 2:
+        return [(0, n - 1, False)]
+    segments = []
+    seg_start = 0
+    seg_style = flags[1]
+    for i in range(2, n):
+        if flags[i] != seg_style:
+            segments.append((seg_start, i - 1, seg_style))
+            seg_start = i - 1
+            seg_style = flags[i]
+    segments.append((seg_start, n - 1, seg_style))
+    return segments
+
+
 def build_forecast_chart(history, forecast_months, saved_results: list, draft_result) -> go.Figure:
     """History solid, forecast dashed, shaded likely range, one colour per
     scenario. The live draft gets a reserved colour, a thicker line, and a
     distinct dash pattern so it never blends in with a saved scenario -- it
     is the one line on this chart that moves as the sidebar is edited.
+
+    Months whose budget goes outside the range the model was tested on are
+    drawn as a dotted, dimmed segment with a visually widened likely range
+    -- the forecast number itself is unchanged, only how certain it looks.
     """
     fig = go.Figure()
 
@@ -71,30 +103,56 @@ def build_forecast_chart(history, forecast_months, saved_results: list, draft_re
         lower = [last_y] + list(result.lower)
         upper = [last_y] + list(result.upper)
 
-        fig.add_trace(
-            go.Scatter(
-                x=x + x[::-1],
-                y=upper + lower[::-1],
-                fill="toself",
-                fillcolor=_rgba(color, 0.15),
-                line=dict(width=0),
-                hoverinfo="skip",
-                showlegend=False,
-                name=f"{name} {copy.CHART_FORECAST_LIKELY_RANGE_LABEL}",
+        breach_months = {b.month for b in result.guardrail_breaches}
+        flags = [False] + [(m + 1) in breach_months for m in range(len(forecast_months))]
+        segments = _line_segments(flags)
+
+        for seg_i, (start, end, unreliable) in enumerate(segments):
+            seg_x = x[start : end + 1]
+            seg_y = y[start : end + 1]
+            seg_lower = lower[start : end + 1]
+            seg_upper = upper[start : end + 1]
+
+            if unreliable:
+                mid = [(lo + hi) / 2 for lo, hi in zip(seg_lower, seg_upper)]
+                half = [(hi - lo) / 2 * UNRELIABLE_RANGE_WIDEN_FACTOR for lo, hi in zip(seg_lower, seg_upper)]
+                seg_lower = [m - h for m, h in zip(mid, half)]
+                seg_upper = [m + h for m, h in zip(mid, half)]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=seg_x + seg_x[::-1],
+                    y=seg_upper + seg_lower[::-1],
+                    fill="toself",
+                    fillcolor=_rgba(color, 0.25 if unreliable else 0.15),
+                    line=dict(width=0),
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name=f"{name} {copy.CHART_FORECAST_LIKELY_RANGE_LABEL}",
+                )
             )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=y,
-                mode="lines+markers",
-                name=name,
-                line=dict(color=color, width=width, dash=dash),
-                marker=dict(size=4),
-                text=[format_currency(v) for v in y],
-                hovertemplate="%{x|%b %Y}<br>%{text}<extra>" + name + "</extra>",
+
+            seg_text = [format_currency(v) for v in seg_y]
+            hovertemplate = "%{x|%b %Y}<br>%{text}"
+            if unreliable:
+                hovertemplate += "<br><i>" + copy.GUARDRAIL_UNRELIABLE_HOVER + "</i>"
+            hovertemplate += "<extra>" + name + "</extra>"
+
+            fig.add_trace(
+                go.Scatter(
+                    x=seg_x,
+                    y=seg_y,
+                    mode="lines+markers",
+                    name=name,
+                    legendgroup=name,
+                    showlegend=(seg_i == 0),
+                    opacity=UNRELIABLE_OPACITY if unreliable else 1.0,
+                    line=dict(color=color, width=width, dash="dot" if unreliable else dash),
+                    marker=dict(size=4),
+                    text=seg_text,
+                    hovertemplate=hovertemplate,
+                )
             )
-        )
 
         if result.scenario.uplifts:
             ux = [forecast_months[u.month - 1] for u in result.scenario.uplifts]

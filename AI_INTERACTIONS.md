@@ -413,6 +413,50 @@ the generic "too small" guardrail, since zero isn't just an extreme value
 on the same scale -- it's a different regime the model has nothing to say
 about.
 
+### Two features reported complete that did nothing
+
+The user found two controls that rendered, accepted a click, and had zero
+visible effect -- both had been reported as working in earlier checkpoints.
+
+**"Show me an example."** The button existed, its click handler ran
+without error, and it genuinely added something to `st.session_state.scenarios`
+-- but as a new *saved* scenario, not a change to the draft the user was
+looking at in the sidebar. The budget table stayed at zero, the initiatives
+table stayed empty, and the panel closed immediately after the click, so
+there was nothing left on screen to suggest anything had happened unless
+you scrolled to the comparison table and recognised a new row. The AI's
+original design in checkpoint 6 read section 7's "adds a demo scenario"
+literally -- a new `Scenario` object -- without asking what a demo is *for*:
+showing the mechanic in the controls the user would actually use, not
+adding an entry to a table three scrolls down. Fixed by populating
+`draft_budget` and `draft_uplifts_df` directly, the same session-state keys
+the sidebar's own tables read from.
+
+**Saved scenario budgets.** Conservative, Plan, and Aggressive drove the
+forecast chart and comparison table from the first checkpoint they
+appeared in, but nothing let a viewer see what any of them actually
+contained -- the exact monthly figures existed only inside `Scenario`
+objects in `st.session_state.scenarios`, never rendered anywhere. This
+was not a regression; it was a capability that was never built, reported
+as done because the *outputs* of those scenarios were visibly correct.
+The user's framing: "she must be able to answer 'what is Aggressive
+actually spending?' without guessing." Fixed with a scenario selector plus
+a "Load" button that copies a saved scenario's budget and initiatives
+into the same editable tables the draft uses (inspectable, and editable
+without altering the saved version unless re-saved under the same name),
+and a "Monthly budget" column added to the comparison table so the range
+is visible without loading anything at all.
+
+Both were caught by the user actually looking at and clicking the app, not
+by the test suite -- `AppTest` had exercised both code paths already
+(button clicks that "worked," a rendered comparison table) and found
+nothing wrong, because nothing in either test asserted the *specific*
+place a demo/inspection feature is supposed to put its result. New tests
+for both check state in the exact location the feature promises to affect
+(`draft_budget`/`draft_uplifts_df` after "Show me an example"; session
+state after a scenario load), mutation-checked by breaking each fix and
+confirming the test fails before restoring.
+
 ---
 
 ## Overrides

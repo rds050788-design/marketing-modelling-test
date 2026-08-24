@@ -47,20 +47,40 @@ def test_reopen_button_shows_the_panel_again_after_dismissal():
     assert at.session_state["show_welcome"] is True
 
 
-def test_show_me_an_example_adds_a_demo_scenario_with_a_battle_pass_uplift():
+def test_show_me_an_example_populates_the_draft_not_a_saved_scenario():
+    # Previously this button added a new *saved* scenario, invisible unless
+    # you scrolled to the comparison table -- the sidebar (budget table,
+    # initiatives table) stayed completely blank, so it looked like the
+    # button did nothing. Fixed to populate the draft directly: the same
+    # tables she'd edit herself.
     at = _fresh_app()
+    assert at.session_state["draft_budget"] == [0] * 12  # sanity: starts blank
+
     example = next(b for b in at.button if b.label == copy.WELCOME_EXAMPLE_BUTTON)
     example.click().run(timeout=30)
 
     assert not at.exception
     assert at.session_state["show_welcome"] is False
 
-    demo = at.session_state["scenarios"][copy.WELCOME_EXAMPLE_SCENARIO_NAME]
-    assert len(demo.uplifts) == 1
-    assert demo.uplifts[0].note == copy.WELCOME_EXAMPLE_UPLIFT_NOTE
+    # The sidebar's own budget table changed -- not a separate saved scenario.
+    assert at.session_state["draft_budget"] != [0] * 12
+    assert all(b > 0 for b in at.session_state["draft_budget"])
+    assert "scenarios" not in at.session_state or set(at.session_state["scenarios"].keys()) == {
+        "Conservative",
+        "Plan",
+        "Aggressive",
+    }
 
+    uplifts_df = at.session_state["draft_uplifts_df"]
+    assert len(uplifts_df) == 1
+    assert uplifts_df.iloc[0][copy.INITIATIVES_NOTE_COLUMN] == copy.WELCOME_EXAMPLE_UPLIFT_NOTE
+    assert uplifts_df.iloc[0][copy.INITIATIVES_MODE_COLUMN] == copy.UPLIFT_MODE_PERMANENT
+
+    # And the chart's draft line reflects it -- no longer flat at the
+    # baseline-only trajectory a zero budget would produce.
     table = at.dataframe[0].value
-    assert copy.WELCOME_EXAMPLE_SCENARIO_NAME in table["Scenario"].tolist()
+    draft_row = table[table["Scenario"].str.contains("Current plan")].iloc[0]
+    assert draft_row[copy.HEADLINE_TOTAL_SPEND] != "€0"
 
 
 def test_export_button_present_with_correct_label():

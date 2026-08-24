@@ -26,8 +26,21 @@ WELCOME_DISMISS_BUTTON = "Got it"
 WELCOME_EXAMPLE_BUTTON = "Show me an example"
 WELCOME_REOPEN_BUTTON = "?"
 WELCOME_REOPEN_TOOLTIP = "Show the introduction again"
-WELCOME_EXAMPLE_SCENARIO_NAME = "Example: Battle pass launch"
 WELCOME_EXAMPLE_UPLIFT_NOTE = "Battle pass launch"
+
+# --- Sidebar: load a saved scenario ------------------------------------------
+
+LOAD_SCENARIO_SECTION_HEADER = "View or load a saved scenario"
+LOAD_SCENARIO_LABEL = "Scenario"
+LOAD_SCENARIO_HELP = (
+    "Pick a saved scenario to see exactly what budget and initiatives it contains."
+)
+LOAD_SCENARIO_BUTTON = "Load into the editor below"
+LOAD_SCENARIO_BUTTON_HELP = (
+    "Copies this scenario's budget and initiatives into the tables below so you can "
+    "see every number, or change them. This does not change the saved scenario "
+    "unless you save over it with the same name."
+)
 
 # --- Sidebar: marketing budget ---------------------------------------------
 
@@ -89,16 +102,22 @@ GUARDRAIL_MOM_CHANGE = (
     "This is a much bigger month-to-month change in spend than we've seen before — "
     "treat with caution"
 )
-GUARDRAIL_SCENARIO_MARKER = "*"
+GUARDRAIL_SCENARIO_MARKER = "⚠"
 GUARDRAIL_SCENARIO_FOOTNOTE = (
-    "* This scenario's budget goes outside the range tested in the underlying data — "
-    "treat its forecast with extra caution."
+    "⚠ means this plan's budget goes beyond anything tried before. Its forecast is "
+    "shown as a dotted, lighter line with a wider likely range, because it's less "
+    "certain than the rest."
+)
+GUARDRAIL_UNRELIABLE_HOVER = (
+    "This plan goes beyond every marketing budget ever tried, so this part of the "
+    "forecast is less certain."
 )
 
 # --- Headline metrics (section 6, item 1) -----------------------------------
 
 HEADLINE_TOTAL_REVENUE = "Total 12-month revenue"
 HEADLINE_TOTAL_SPEND = "Total marketing spend"
+HEADLINE_MONTHLY_BUDGET_COLUMN = "Monthly budget"
 HEADLINE_REVENUE_PER_SPEND = "Revenue per €1 spent"
 HEADLINE_VS_BASELINE = "Change vs the baseline scenario"
 HEADLINE_DRAFT_SCENARIO_LABEL = "Current plan (unsaved)"
@@ -107,11 +126,20 @@ HEADLINE_SECTION_CAPTION = "Your current plan, compared to the {baseline} scenar
 # --- Charts (section 6, items 2-4) ------------------------------------------
 
 CHART_FORECAST_TITLE = "Revenue forecast"
+CHART_FORECAST_CAPTION = (
+    "Coloured dashed lines are your saved plans, each with a fixed budget. The "
+    "white line is the plan you're currently editing in the sidebar, not yet saved."
+)
 CHART_FORECAST_HISTORY_LABEL = "History"
 CHART_FORECAST_LIKELY_RANGE_LABEL = "Likely range"
 CHART_UPLIFT_DEFAULT_NOTE = "Game initiative"
 CHART_COMPARE_TITLE = "Compare scenarios"
+CHART_COMPARE_CAPTION = "Every saved plan, plus the one you're currently editing."
 CHART_DRIVERS_TITLE = "Where revenue comes from"
+CHART_DRIVERS_CAPTION = (
+    "Base business is what the game would earn with no extra marketing — the same "
+    "for every plan, because it doesn't depend on what you spend."
+)
 CHART_DRIVERS_BASE_LABEL = "Base business"
 CHART_DRIVERS_MARKETING_LABEL = "From marketing"
 CHART_DRIVERS_INITIATIVES_LABEL = "From initiatives"
