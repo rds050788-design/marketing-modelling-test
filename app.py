@@ -4,6 +4,8 @@ This checkpoint covers the sidebar inputs, pre-seeded scenarios, and range
 guardrails. Charts, the tutorial, and export are added in later checkpoints.
 """
 
+import io
+
 import pandas as pd
 import streamlit as st
 
@@ -78,9 +80,36 @@ if "draft_uplifts_df" not in st.session_state:
     )
 if "draft_baseline_growth_pct" not in st.session_state:
     st.session_state.draft_baseline_growth_pct = round(FITTED.intercept * 100, 1)
+if "show_welcome" not in st.session_state:
+    st.session_state.show_welcome = True
 
-st.title(copy.APP_TITLE)
+title_col, reopen_col = st.columns([20, 1])
+with title_col:
+    st.title(copy.APP_TITLE)
+with reopen_col:
+    if st.button(copy.WELCOME_REOPEN_BUTTON, help=copy.WELCOME_REOPEN_TOOLTIP):
+        st.session_state.show_welcome = True
 st.caption(copy.APP_TAGLINE)
+
+if st.session_state.show_welcome:
+    with st.container(border=True):
+        st.markdown(f"**{copy.WELCOME_TITLE}**")
+        for i, step in enumerate(copy.WELCOME_STEPS, start=1):
+            st.markdown(f"{i}. {step}")
+        dismiss_col, example_col = st.columns(2)
+        with dismiss_col:
+            if st.button(copy.WELCOME_DISMISS_BUTTON, use_container_width=True):
+                st.session_state.show_welcome = False
+                st.rerun()
+        with example_col:
+            if st.button(copy.WELCOME_EXAMPLE_BUTTON, use_container_width=True):
+                st.session_state.scenarios[copy.WELCOME_EXAMPLE_SCENARIO_NAME] = Scenario(
+                    name=copy.WELCOME_EXAMPLE_SCENARIO_NAME,
+                    monthly_budget=default_budget(1.0),
+                    uplifts=[Uplift(month=6, pct=0.15, mode=PERMANENT, note=copy.WELCOME_EXAMPLE_UPLIFT_NOTE)],
+                )
+                st.session_state.show_welcome = False
+                st.rerun()
 
 with st.sidebar:
     st.header(copy.BUDGET_SECTION_HEADER)
@@ -228,6 +257,31 @@ comparison_table = pd.DataFrame(
 st.dataframe(comparison_table, hide_index=True, use_container_width=True)
 if any(result.guardrail_breaches for result in all_results):
     st.caption(copy.GUARDRAIL_SCENARIO_FOOTNOTE)
+
+export_table = pd.DataFrame(
+    [
+        {
+            "Scenario": display_name(result),
+            copy.HEADLINE_TOTAL_REVENUE: row.total_revenue,
+            copy.HEADLINE_TOTAL_SPEND: row.total_spend,
+            copy.HEADLINE_REVENUE_PER_SPEND: row.revenue_per_spend,
+            copy.HEADLINE_VS_BASELINE: row.delta_vs_baseline * 100,
+            copy.CHART_DRIVERS_BASE_LABEL: float(result.base_business.sum()),
+            copy.CHART_DRIVERS_MARKETING_LABEL: float(result.from_marketing.sum()),
+            copy.CHART_DRIVERS_INITIATIVES_LABEL: float(result.from_initiatives.sum()),
+        }
+        for result, row in zip(all_results, rows)
+    ]
+)
+excel_buffer = io.BytesIO()
+with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+    export_table.to_excel(writer, index=False, sheet_name="Comparison")
+st.download_button(
+    copy.EXPORT_BUTTON_LABEL,
+    data=excel_buffer.getvalue(),
+    file_name="revenue_scenario_comparison.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
 
 st.subheader(copy.CHART_DRIVERS_TITLE)
 driver_fig = build_driver_chart(saved_results, draft_result)

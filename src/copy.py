@@ -23,6 +23,7 @@ WELCOME_STEPS = [
 ]
 WELCOME_DISMISS_BUTTON = "Got it"
 WELCOME_EXAMPLE_BUTTON = "Show me an example"
+WELCOME_REOPEN_BUTTON = "?"
 WELCOME_REOPEN_TOOLTIP = "Show the introduction again"
 WELCOME_EXAMPLE_SCENARIO_NAME = "Example: Battle pass launch"
 WELCOME_EXAMPLE_UPLIFT_NOTE = "Battle pass launch"

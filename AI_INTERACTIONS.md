@@ -54,6 +54,19 @@ revert, confirm the suite is clean again — before being reported as
 protecting against that class of bug. Done again for the visual-4
 decomposition-sum test (see Overrides).
 
+### Excel export: raw numbers, not the on-screen formatted strings
+
+The on-screen comparison table displays pre-formatted text ("€262.6M",
+"+7.3%") per section 5's plain-language rule. The Excel export reuses the
+same column headers but writes the underlying numeric values instead
+(revenue/spend as floats, the baseline delta as a percentage number, not a
+formatted string) -- a deliberate divergence from "what you see is what you
+export." Reasoning: section 6 states her next action is "pasting numbers
+into a deck," which implies she can sum, chart, or reformat the figures in
+Excel; exporting pre-formatted text strings like "€262.6M" into spreadsheet
+cells would block that. Verified the round trip actually produces numeric
+(not text) columns, not just that the file opens.
+
 ### Palette assumed a light background
 
 After all four checkpoint-5 visuals were built, the user reported the
@@ -89,6 +102,22 @@ this reasoning was inferred rather than confirmed, and is stated plainly
 here rather than left implicit. A residual gap: a viewer can still manually
 switch themes via Streamlit's own Settings menu, and there is no
 server-side way to prevent that.
+
+### Stakeholder UI review before checkpoint 6
+
+Before starting the tutorial and export, the user asked for a presentation-
+only review of the app as it stood for a non-technical stakeholder, with an
+explicit instruction not to implement any of it -- list findings, ranked by
+impact, and let the user pick. The review was grounded in the app's actual
+rendered output (pulled via `AppTest` -- widget labels, help text, table
+contents) rather than a re-read of the source, which surfaced two things a
+code read alone would have missed: a hardcoded `"Apply"` button string that
+had slipped past every previous audit of the no-hardcoded-strings rule, and
+a signed-zero formatting artifact (`+0.0%` vs `-0.0%` for two scenarios with
+identical budgets) caused by floating-point noise between two independently
+computed paths landing a few cents apart. Findings list is in the
+2026-08-24 conversation; none were applied in this pass -- the user has not
+yet picked which to act on.
 
 ---
 
