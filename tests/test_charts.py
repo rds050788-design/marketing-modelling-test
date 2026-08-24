@@ -12,7 +12,7 @@ than requiring a person to notice it in the browser.
 import pandas as pd
 import pytest
 
-from src.charts import build_forecast_chart, display_name
+from src.charts import build_comparison_chart, build_forecast_chart, display_name
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import Scenario, Uplift, run_scenario
 
@@ -86,3 +86,34 @@ def test_chart_uplift_marker_uses_the_users_note(fitted, history, forecast_month
     marker_traces = [t for t in fig.data if t.name and t.name.endswith("initiatives")]
     assert len(marker_traces) == 1
     assert marker_traces[0].text[0] == "Battle pass launch"
+
+
+def test_comparison_chart_includes_draft_and_reacts_to_budget_change(fitted):
+    saved = [run_scenario(fitted, Scenario(name="Plan", monthly_budget=[fitted.last_spend] * FORECAST_HORIZON))]
+    draft_low = run_scenario(fitted, Scenario(name="Draft", monthly_budget=[fitted.last_spend * 0.8] * FORECAST_HORIZON))
+    draft_high = run_scenario(fitted, Scenario(name="Draft", monthly_budget=[fitted.last_spend * 1.3] * FORECAST_HORIZON))
+
+    fig_low = build_comparison_chart(saved, draft_low)
+    fig_high = build_comparison_chart(saved, draft_high)
+
+    names = list(fig_low.data[0].y)
+    assert "Plan" in names
+    assert display_name(draft_low) in names
+
+    totals_low = dict(zip(fig_low.data[0].y, fig_low.data[0].x))
+    totals_high = dict(zip(fig_high.data[0].y, fig_high.data[0].x))
+    assert totals_low[display_name(draft_low)] != totals_high[display_name(draft_high)]
+    assert totals_low["Plan"] == totals_high["Plan"]
+
+
+def test_comparison_chart_marks_out_of_range_scenario(fitted):
+    spend_hi = fitted.spend_range[1]
+    breaching = run_scenario(fitted, Scenario(name="Aggressive", monthly_budget=[spend_hi * 2] * FORECAST_HORIZON))
+    clean_draft = run_scenario(fitted, Scenario(name="Draft", monthly_budget=[fitted.last_spend] * FORECAST_HORIZON))
+
+    fig = build_comparison_chart([breaching], clean_draft)
+    names = list(fig.data[0].y)
+
+    assert "Aggressive *" in names
+    assert display_name(clean_draft) in names
+    assert not display_name(clean_draft).endswith("*")

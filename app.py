@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from src import copy
-from src.charts import build_forecast_chart, display_name
+from src.charts import build_comparison_chart, build_forecast_chart, display_name
 from src.formatting import format_currency, format_date, format_percent
 from src.model import FORECAST_HORIZON, fit_model, load_history
 from src.scenarios import ONE_MONTH, PERMANENT, Scenario, Uplift, check_guardrails, compare_scenarios, run_scenario
@@ -210,6 +210,9 @@ forecast_fig = build_forecast_chart(HISTORY, FORECAST_MONTHS, saved_results, dra
 st.plotly_chart(forecast_fig, use_container_width=True)
 
 st.subheader(copy.CHART_COMPARE_TITLE)
+comparison_fig = build_comparison_chart(saved_results, draft_result)
+st.plotly_chart(comparison_fig, use_container_width=True)
+
 comparison_table = pd.DataFrame(
     [
         {
