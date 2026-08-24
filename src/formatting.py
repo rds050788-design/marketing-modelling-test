@@ -27,8 +27,15 @@ def format_date(value) -> str:
 
 
 def format_percent(value: float, signed: bool = False) -> str:
-    """Formats a fraction as a percentage, e.g. 0.129 -> "12.9%"."""
+    """Formats a fraction as a percentage, e.g. 0.129 -> "12.9%".
+
+    Two scenarios with the same inputs can differ by a fraction of a cent
+    after passing through independently computed paths -- without this,
+    that shows up as "+0.0%" for one and "-0.0%" for the other, which reads
+    as a real difference. Rounding to zero always displays as "+0.0%".
+    """
     pct = value * 100
     if signed:
-        return f"{pct:+.1f}%"
+        formatted = f"{pct:+.1f}%"
+        return "+0.0%" if formatted == "-0.0%" else formatted
     return f"{pct:.1f}%"

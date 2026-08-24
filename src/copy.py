@@ -37,6 +37,7 @@ BUDGET_SCALE_HELP = (
     "Quickly raise or lower every month's budget by the same percentage, "
     "instead of editing each one."
 )
+BUDGET_SCALE_APPLY_BUTTON = "Apply"
 BUDGET_MONTH_COLUMN = "Month"
 BUDGET_AMOUNT_COLUMN = "Marketing budget (€M)"
 

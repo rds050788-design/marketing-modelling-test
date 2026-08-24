@@ -31,3 +31,12 @@ def test_format_percent_unsigned():
 def test_format_percent_signed():
     assert format_percent(0.129, signed=True) == "+12.9%"
     assert format_percent(-0.048, signed=True) == "-4.8%"
+
+
+def test_format_percent_signed_zero_never_shows_a_minus_sign():
+    # Two scenarios with identical inputs can land a hair apart after
+    # independently computed floating-point paths; a tiny negative delta
+    # must not render as "-0.0%" next to another scenario's clean "+0.0%".
+    assert format_percent(0.0, signed=True) == "+0.0%"
+    assert format_percent(-1e-12, signed=True) == "+0.0%"
+    assert format_percent(-0.00001, signed=True) == "+0.0%"

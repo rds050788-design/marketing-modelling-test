@@ -142,7 +142,7 @@ with st.sidebar:
     with apply_col:
         st.write("")
         st.write("")
-        if st.button("Apply", key="apply_scale"):
+        if st.button(copy.BUDGET_SCALE_APPLY_BUTTON, key="apply_scale"):
             factor = 1 + scale_pct / 100
             st.session_state.draft_budget = [round(b * factor) for b in st.session_state.draft_budget]
             st.rerun()
