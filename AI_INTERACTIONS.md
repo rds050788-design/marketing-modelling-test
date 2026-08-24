@@ -10,6 +10,28 @@ roughly two hours before any application code was written; the build that
 follows was done in Claude Code, working from the frozen decision record
 that specification phase produced (`CLAUDE.md`).
 
+## Table of contents
+
+**Override moments** — where the user overrode the AI's judgment, listed
+first since these are the highest-signal entries in this document:
+
+- [β0 transcription error](#β0-transcription-error) — a wrong diagnosis of
+  the spec's own numbers, corrected by the user re-deriving them
+- [Stale live-server verification gap](#stale-live-server-verification-gap)
+  — "verified" was true of the source, false of the running app
+- [Draft/saved split broke live-edit propagation to visuals](#draftsaved-split-broke-live-edit-propagation-to-visuals)
+  — three of four visuals silently ignored the thing being edited
+- [Visual 4 scope: aggregate per-scenario decomposition, not monthly](#visual-4-scope-aggregate-per-scenario-decomposition-not-monthly)
+  — overridden from a monthly to a per-scenario view
+- [Build order: risk-first over dependency-first](#build-order-risk-first-over-dependency-first)
+  — overridden from a bottom-up dependency order
+
+**Specification** (§1–12) — the modelling debate, chat interface, before
+any code existed. **Build** — the checkpoint-by-checkpoint build, including
+the bugs and gaps the override moments above are drawn from in more
+detail. Both sections keep their numbered/named entries below, in the
+order they happened.
+
 ---
 
 ## Specification
@@ -236,34 +258,28 @@ Decisions about how the build itself would be run:
 
 ### Verification recovery
 
-Across checkpoint 5's first two visuals, the AI reported completion twice on
-verification that had not actually run against the thing being verified: an
-`AppTest` subprocess that read correct files while the live server serving
-`localhost:8501` was stale (see the stale live-server entry below), and then
-a chart that structurally rendered but never received the live draft (see
-the draft/saved split entry below) — the second bug slipped past `AppTest`
-for a different reason than the first: not stale process state this time,
-but a test that only checked "does it render," never "does it react to a
+Across checkpoint 5's first two visuals, completion was reported twice on
+verification that hadn't run against the thing being verified: a stale
+live server behind an `AppTest` that only ever saw correct files (see
+Overrides), then a chart that rendered but never received the live draft
+(see Overrides) — the second miss for a different reason than the first,
+since that `AppTest` checked "does it render," never "does it react to a
 changed input."
 
-After the second miss, the AI's response changed in kind: rather than
-substitute another `AppTest` run and call it equivalent to what the user
-asked for ("not AppTest — a real interaction"), it stated the actual
-limitation plainly — no browser automation available in this session — and
-built a different kind of verification instead of a differently-labelled
-same kind. It extracted the chart-building logic out of `app.py` into a
-Streamlit-free module (`src/charts.py`) specifically so a real pytest test
-could call the exact production function with two different budgets and
-assert the output differs — a data-flow check, not a structural one. It then
-proved that test wasn't vacuous by temporarily reintroducing the original
-bug and confirming the new test failed against it, before reverting.
+After the second miss, the response changed in kind. Rather than
+substitute another `AppTest` run for what the user asked for ("not
+AppTest — a real interaction"), it named the actual limitation (no browser
+automation in this session) and built a genuinely different check instead:
+chart-building logic extracted into a Streamlit-free module (`src/charts.py`)
+so a pytest test could call the real production function and assert its
+output actually differs across inputs, then proved that test wasn't
+vacuous by breaking the fix and confirming it failed before reverting.
 
-This is the point the verification practice changed for the rest of the
-build: every new regression test added from here on is mutation-checked —
-temporarily reintroduce the bug it targets, confirm the test fails,
-revert, confirm the suite is clean again — before being reported as
-protecting against that class of bug. Done again for the visual-4
-decomposition-sum test (see Overrides).
+This is where the verification practice changed for the rest of the
+build: every new regression test from here on is mutation-checked —
+break it, confirm the test fails, revert, confirm the suite is clean
+again — before being reported as protecting against that class of bug.
+Done again for the visual-4 decomposition-sum test (see Overrides).
 
 ### Excel export: raw numbers, not the on-screen formatted strings
 
@@ -293,26 +309,23 @@ default -- so the same app renders light for some reviewers and dark for
 others, and nothing had been checked against the dark case at all.
 
 Fix: loaded the `dataviz` skill for its validated categorical palette
-(pre-checked for CVD-safe separation and contrast on both a light and dark
-reference surface) rather than hand-picking replacement hex values the same
-way the original colours were picked. No JS runtime was available in this
-environment to run the skill's own validator script, so the draft colour and
-the app's own additions (segment colours, history line, marker outline) were
-contrast-checked directly via the WCAG luminance-contrast formula in Python
-instead. Moved every chart colour into a new `src/theme.py`, and pinned an
-explicit dark theme in `.streamlit/config.toml` -- both requested by name.
+(CVD-safe, contrast-checked on both light and dark reference surfaces)
+rather than hand-picking replacement hex values the same way the original
+colours were picked. No JS runtime was available to run the skill's own
+validator, so the draft colour and the app's own additions were
+contrast-checked directly via the WCAG luminance formula in Python
+instead. Moved every chart colour into a new `src/theme.py`, and pinned
+an explicit dark theme in `.streamlit/config.toml` -- both requested by name.
 
-Pinning the theme is not just a convenience here: computed contrast shows
-white has 17.4:1 contrast on the dark surface but only 1.03:1 on a light one
--- no single flat colour has strong contrast against both a near-black and a
-near-white surface, so "reads on both light and dark themes" is only true in
-practice because the pin ensures just one surface ever actually renders.
-Dark was chosen because the user's own fix language ("near-white or a
-bright neutral") only makes sense as a choice if dark is the pinned surface;
-this reasoning was inferred rather than confirmed, and is stated plainly
-here rather than left implicit. A residual gap: a viewer can still manually
-switch themes via Streamlit's own Settings menu, and there is no
-server-side way to prevent that.
+Pinning the theme isn't just tidiness: computed contrast shows white at
+17.4:1 on the dark surface but only 1.03:1 on a light one -- no single
+flat colour reads on both a near-black and a near-white surface, so
+"reads on both themes" is only true because the pin ensures just one
+surface ever renders. Dark was chosen because the user's own fix language
+("near-white or a bright neutral") only makes sense if dark is the pinned
+surface -- inferred, not confirmed, and stated as such. Residual gap: a
+viewer can still manually flip themes via Streamlit's own Settings menu,
+with no server-side way to prevent it.
 
 A follow-up correction: the driver chart's "base business" segment was
 initially given a very light warm grey (`#c3c2b7`, 9.72:1 contrast) that
@@ -349,12 +362,10 @@ string value. Clean.
 Implemented the two UI-review findings the user accepted: moved the
 hardcoded `"Apply"` button string into `copy.py` as
 `BUDGET_SCALE_APPLY_BUTTON`, and fixed `format_percent`'s signed-zero
-artifact by special-casing the "-0.0%" output to "+0.0%" -- rounding to
-zero now always displays as positive regardless of which side of zero the
-underlying float actually landed on. Both changes are presentation-only,
-per the review's own scope. Mutation-checked the signed-zero fix:
-temporarily reverted it, confirmed the new test failed with the exact
-"-0.0%" the user reported, reverted the revert.
+artifact by special-casing "-0.0%" to "+0.0%" -- rounding to zero now
+always displays as positive regardless of which side of zero the
+underlying float landed on. Both presentation-only, per the review's own
+scope; the signed-zero fix was mutation-checked.
 
 ### Checkpoint 7: a requirements.txt pin that had never actually been tested
 
@@ -371,13 +382,12 @@ compatibility path inside statsmodels, and an unpinned `scipy` resolved to
 a version that had removed `scipy._lib._util._lazywhere`, which
 statsmodels 0.14.4 imports. Neither failure was visible from the Python
 3.14 dev venv, where newer versions of everything happened to still work
-together. Root-caused empirically inside throwaway containers (bisecting
-package versions, not reasoning from changelogs) and pinned `numpy==2.1.3`
-(contemporary with statsmodels 0.14.4's release) and a new explicit
-`scipy==1.14.1`. Rebuilt the real image, ran the full test suite inside
-the container (not the host venv), and booted the container to confirm
-the app itself serves -- all three passed clean, which is the first time
-these exact pinned versions had actually been exercised end to end.
+together. Root-caused empirically in throwaway containers (bisecting
+versions, not reading changelogs); pinned `numpy==2.1.3` (contemporary
+with statsmodels 0.14.4's release) and a new explicit `scipy==1.14.1`.
+Rebuilt the image, ran the full suite inside the container, and booted it
+to confirm the app serves -- the first time these exact pins had been
+exercised end to end.
 
 ### Zero budget: a modelling boundary, not just an input gap
 
@@ -393,15 +403,13 @@ the guardrail code -- the growth-rate-with-carryover specification
 entire mechanism is a log-difference, and `log(0)` is `-inf` by
 definition, not an implementation oversight.
 
-Confirmed by reverting only the `check_guardrails` fix: exact reported
-`ZeroDivisionError`. Confirmed separately by reverting only the
-`model.py` fix (with `check_guardrails` left correct): no exception at
-all -- `log(0)` propagates through `numpy` as `-inf`, then `nan`, silently
-corrupting every month *after* the zero one into `nan`, which is arguably
-worse than a crash since nothing signals that anything went wrong. Both
-were real, independent failure modes stacked in the same code path, and
-the second would have shipped invisibly if the fix had stopped at the
-division.
+Reverting only the `check_guardrails` fix reproduced the exact reported
+`ZeroDivisionError`. Reverting only the `model.py` fix reproduced a second,
+independent failure that raised nothing at all: `log(0)` propagates as
+`-inf`, then `nan`, silently corrupting every month *after* the zero one
+-- arguably worse than a crash since nothing signals anything went wrong.
+Both were real and stacked in the same code path; the second would have
+shipped invisibly if the fix had stopped at the division.
 
 Resolution treats zero as a boundary condition of the specification, not
 noise to be validated away: any month-over-month transition touching a
@@ -447,15 +455,11 @@ without altering the saved version unless re-saved under the same name),
 and a "Monthly budget" column added to the comparison table so the range
 is visible without loading anything at all.
 
-Both were caught by the user actually looking at and clicking the app, not
-by the test suite -- `AppTest` had exercised both code paths already
-(button clicks that "worked," a rendered comparison table) and found
-nothing wrong, because nothing in either test asserted the *specific*
-place a demo/inspection feature is supposed to put its result. New tests
-for both check state in the exact location the feature promises to affect
-(`draft_budget`/`draft_uplifts_df` after "Show me an example"; session
-state after a scenario load), mutation-checked by breaking each fix and
-confirming the test fails before restoring.
+Both were caught by the user actually clicking the app, not by the test
+suite: `AppTest` had already exercised both code paths and found nothing
+wrong, because nothing asserted the *specific* place a demo/inspection
+feature is supposed to put its result. New tests for both check state at
+that exact location, mutation-checked.
 
 ---
 
@@ -524,17 +528,14 @@ actually editing.
 
 **Caught by the user manually interacting with the running app, not by the
 test suite** -- `AppTest` had already run clean against this exact code
-(the chart rendered, had the right trace count, no exceptions) because it
-only checked structural presence, never that the chart actually responds to
-a changed input. Fixed by computing one `all_results = saved_results +
-[draft_result]` list that every visual (chart, table, footnote) reads from,
-so there is a single source of truth instead of three parallel readings
-of "the current scenario." Verification for this fix used a different
-method deliberately: `src/charts.py`'s chart-building logic was extracted
-out of `app.py` into a Streamlit-free module specifically so a real pytest
-test (`tests/test_charts.py`) could call it directly with two different
-draft budgets and assert the resulting chart line actually differs --
-proving the fix with a genuine data-flow check rather than another
+(chart rendered, right trace count, no exceptions) because it only checked
+structural presence, never that the chart responds to a changed input.
+Fixed by computing one `all_results = saved_results + [draft_result]` list
+every visual reads from, instead of three parallel readings of "the
+current scenario." Verified with a different method deliberately:
+`src/charts.py`'s logic extracted into a Streamlit-free module so a real
+pytest test could call it with two different draft budgets and assert the
+output actually differs -- a data-flow check, not another
 structural-presence pass.
 
 ### Visual 4 scope: aggregate per-scenario decomposition, not monthly

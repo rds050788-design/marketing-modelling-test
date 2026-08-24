@@ -307,6 +307,12 @@ export_table = pd.DataFrame(
             "Scenario": display_name(result),
             copy.HEADLINE_TOTAL_REVENUE: row.total_revenue,
             copy.HEADLINE_TOTAL_SPEND: row.total_spend,
+            # A min-max range isn't a single number to sum or chart, so
+            # unlike the other columns this one keeps the formatted string
+            # -- everything else here is a raw number for the spreadsheet.
+            copy.HEADLINE_MONTHLY_BUDGET_COLUMN: format_currency_range(
+                min(result.scenario.monthly_budget), max(result.scenario.monthly_budget)
+            ),
             copy.HEADLINE_REVENUE_PER_SPEND: row.revenue_per_spend,
             copy.HEADLINE_VS_BASELINE: row.delta_vs_baseline * 100,
             copy.CHART_DRIVERS_BASE_LABEL: float(result.base_business.sum()),
@@ -316,6 +322,7 @@ export_table = pd.DataFrame(
         for result, row in zip(all_results, rows)
     ]
 )
+assert list(export_table.columns) == list(comparison_table.columns), "export columns must match the on-screen table"
 excel_buffer = io.BytesIO()
 with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
     export_table.to_excel(writer, index=False, sheet_name="Comparison")

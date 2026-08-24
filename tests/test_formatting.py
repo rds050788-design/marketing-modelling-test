@@ -1,6 +1,6 @@
 """Tests for currency, date, and percentage formatting (CLAUDE.md section 5)."""
 
-from src.formatting import format_currency, format_date, format_percent
+from src.formatting import format_currency, format_currency_range, format_date, format_percent
 
 
 def test_format_currency_millions():
@@ -17,6 +17,20 @@ def test_format_currency_thousands():
 
 def test_format_currency_negative():
     assert format_currency(-4_400_000) == "-€4.4M"
+
+
+def test_format_currency_zero_stays_in_the_millions_convention():
+    # A bare "€0" next to "€262.6M" in the same table column reads as a
+    # different, broken format -- zero (the draft's default state) must
+    # carry the same M unit as every other value around it.
+    assert format_currency(0) == "€0.0M"
+    assert format_currency(0.0) == "€0.0M"
+
+
+def test_format_currency_range_flat_and_zero():
+    assert format_currency_range(3_500_000, 3_500_000) == "€3.5M"
+    assert format_currency_range(0, 0) == "€0.0M"
+    assert format_currency_range(3_500_000, 4_200_000) == "€3.5M - €4.2M"
 
 
 def test_format_date_month_year():

@@ -9,7 +9,13 @@ import pandas as pd
 
 
 def format_currency(value: float) -> str:
-    """Formats a monetary value as e.g. "€18.2M", never a raw number."""
+    """Formats a monetary value as e.g. "€18.2M", never a raw number.
+
+    Below €1,000 (including exactly zero -- the draft's default state)
+    still renders in the millions convention used everywhere else in this
+    app ("€0.0M"), rather than a bare "€0" that breaks the pattern next to
+    every other value in the same table column.
+    """
     sign = "-" if value < 0 else ""
     value = abs(value)
     if value >= 1_000_000_000:
@@ -18,7 +24,7 @@ def format_currency(value: float) -> str:
         return f"{sign}€{value / 1_000_000:.1f}M"
     if value >= 1_000:
         return f"{sign}€{value / 1_000:.0f}K"
-    return f"{sign}€{value:.0f}"
+    return f"{sign}€{value / 1_000_000:.1f}M"
 
 
 def format_currency_range(low: float, high: float) -> str:

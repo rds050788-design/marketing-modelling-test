@@ -25,38 +25,28 @@ revenue history, not a rule of thumb.
 
 ## How to use it
 
-**The tutorial:** a welcome panel walks through the basics the moment you
-open the app. Click **Got it** once you've read it, or click **Show me an
-example** to have it fill in a realistic budget and a pre-filled
-battle-pass initiative for you, so you can see how everything works
-without typing anything yourself. Click the **?** next to the title any
-time afterward to bring the panel back.
-
 1. **View or load a saved scenario** (top of the sidebar) — pick
    Conservative, Plan, or Aggressive and click **Load** to see exactly
    what budget and initiatives it contains in the tables below. This is
    how you check what a saved plan actually spends, not just its outcome.
-2. **Marketing budget** — a 12-month table you can edit directly, plus a
-   shortcut to scale the whole budget up or down by a percentage in one
-   step. It starts blank; build it up one month at a time, or load a
-   scenario first as a starting point.
-3. **Revenue growth per month without extra marketing** — how fast your
-   game grows on its own, with no extra marketing. This defaults to a
-   fitted value but is deliberately yours to challenge — it's the single
-   biggest lever on the 12-month total, and it isn't something marketing
-   spend can tell you.
-4. **Game initiatives** — add a row for anything you expect to move
+2. **Marketing budget** (left sidebar) — a 12-month table you can edit
+   directly, plus a shortcut to scale the whole budget up or down by a
+   percentage in one step.
+3. **Game initiatives** — add a row for anything you expect to move
    revenue beyond marketing: a month, a percentage, a note ("Battle pass
    launch"), and whether it's a **permanent lift** (revenue stays higher
    every month after) or a **one-month spike** (higher for that month
    only, then back to normal). This distinction matters a lot — the same
    +15% uplift is worth about 12× more over a year as a permanent lift
    than as a one-month spike, since a permanent lift compounds.
-5. Watch the cards, the forecast chart, the comparison table, and the
-   "where revenue comes from" chart update live as you edit. On the
-   forecast chart, coloured dashed lines are your saved plans, each with a
-   fixed budget; the white line is the plan you're currently editing, not
-   yet saved.
+4. **Revenue growth per month without extra marketing** — how fast your
+   game grows on its own, with no extra marketing. This defaults to a
+   fitted value but is deliberately yours to challenge — it's the single
+   biggest lever on the 12-month total, and it isn't something marketing
+   spend can tell you.
+5. Watch the four cards, the forecast chart, and the "where revenue comes
+   from" chart update live as you edit — that's your current plan, shown
+   in white, distinguished from any scenarios you've already saved.
 6. **Save scenario** once you're happy with a plan, to add it to the
    comparison table permanently instead of it just being "current."
 7. A warning icon (⚠) next to a scenario's name means its budget goes
@@ -65,6 +55,9 @@ time afterward to bring the panel back.
    a wider likely range — hover over it to see why. Not a hard stop, just
    a flag that this part of the forecast is less certain than the rest.
 8. **Download comparison as Excel** to take the numbers into a deck.
+
+A welcome panel walks through this on first load; click the `?` next to
+the title to see it again.
 
 ## How to run locally
 
@@ -253,6 +246,13 @@ walk by roughly 5×.
 9. Forecast horizon fixed at 12 months.
 10. The dataset is synthetic and treated as such (see Deployment note,
     below).
+11. The 2.0× widening applied to the likely range on out-of-range forecast
+    segments is a deliberate visual signal that a segment sits outside the
+    model's estimation range, not a calibrated interval — it communicates
+    "less certain," not a specific statistical confidence level.
+12. Scenario selection is intentionally left to the user. The tool
+    compares scenarios and exports them; it does not rank or recommend
+    one over another.
 
 ### What I would do with more time
 
@@ -260,6 +260,9 @@ Geo holdout or spend-variation experiments to identify marketing effect
 causally — the honest conclusion is that this data cannot cleanly separate
 marketing from trend, and the fix is experimental design, not a fancier
 regression. Then a proper MMM once channel-level weekly data exists.
+Cross-browser and responsive-layout verification was not possible in this
+environment (no browser access during development) and should happen
+before wider rollout.
 
 ## Deployment and production note
 
@@ -312,3 +315,4 @@ image, the real pinned dependencies, the real rendered charts, catching
 problems that local shortcuts would have missed. Under a soft time cap,
 this build chose verified over fast; the full account is in
 `AI_INTERACTIONS.md`.
+
